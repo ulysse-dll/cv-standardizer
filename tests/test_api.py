@@ -191,3 +191,13 @@ def test_keep_awake_does_nothing_without_caffeinate(monkeypatch):
     monkeypatch.setattr(batch.shutil, "which", lambda name: None)
     with batch.keep_awake() as process:
         assert process is None
+
+
+def test_old_finished_jobs_are_forgotten(client, samples_dir, monkeypatch):
+    monkeypatch.setattr(batch, "MAX_JOBS_IN_MEMORY", 2)
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    job_ids = [
+        client.post("/api/process", files={"file": ("cv_tableaux_fr.docx", data)}).json()["job_id"] for _ in range(3)
+    ]
+    assert client.get(f"/api/batch/{job_ids[0]}").status_code == 404  # le plus ancien a été oublié
+    assert client.get(f"/api/batch/{job_ids[2]}").status_code == 200

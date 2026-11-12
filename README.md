@@ -16,30 +16,44 @@ Chaque CV ressort en trois fichiers : un **PDF** d'une page A4, une
 **diapositive PowerPoint** (`.pptx`, une seule diapo 16:9, modifiable) et un
 **JSON**.
 
+La diapositive suit toujours le même modèle : un bandeau avec la **photo du
+candidat** en haut à gauche (retrouvée dans son CV ; à défaut, un rond avec
+ses initiales), son nom, son titre et ses coordonnées, puis deux colonnes
+(compétences, langues, formation et certifications à gauche ; profil et
+expériences à droite).
+
 Après le passage du modèle, tu peux **corriger le résultat à la main** dans
 la page : le PDF et la diapositive sont refaits aussitôt, sans relancer le LLM.
 
 ## 1. Installation
 
-### a) Ollama et le modèle
+Deux choses à faire, une seule fois.
 
-1. Installe Ollama : <https://ollama.com/download>
-2. Télécharge le modèle par défaut (3,3 Go) :
+**1. Installe Ollama** : <https://ollama.com/download> (c'est lui qui fait
+tourner le modèle de langage).
 
-   ```sh
-   ollama pull gemma3:4b
-   ```
-
-### b) Python
+**2. Lance le script d'installation** :
 
 ```sh
 cd ~/cv-standardizer
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+./install.sh
 ```
 
-Sur un Mac, c'est tout. Deux fonctions s'appuient sur ce que la machine a
-déjà :
+Il crée l'environnement Python (`.venv`), installe les bibliothèques, crée le
+fichier `.env`, télécharge le modèle par défaut (`gemma3:4b`, 3,3 Go) s'il
+manque, puis affiche un diagnostic. Il peut être relancé sans risque.
+
+Le diagnostic se relance à tout moment :
+
+```sh
+.venv/bin/python -m app.check
+```
+
+Il dit, ligne par ligne, ce qui est prêt et ce qui manque (Ollama lancé ?
+modèle téléchargé ? OCR ? export PDF ?), avec la commande à taper pour
+corriger.
+
+Sur un Mac, deux fonctions s'appuient sur ce que la machine a déjà :
 
 | Fonction | Premier choix | Sinon |
 |---|---|---|
@@ -50,7 +64,21 @@ Le bandeau en haut de la page indique lequel est utilisé. S'il n'y a ni l'un
 ni l'autre, l'application démarre quand même : seuls les PDF scannés ou
 l'export PDF sont indisponibles.
 
-### b bis) Facultatif : Tesseract et Pango
+<details>
+<summary>Installation à la main, sans le script</summary>
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+ollama pull gemma3:4b
+```
+
+`requirements.lock` donne les versions exactes avec lesquelles l'application
+a été testée (macOS, Python 3.9).
+</details>
+
+### Facultatif : Tesseract et Pango
 
 Utile seulement hors Mac, ou si tu préfères ces deux outils.
 
@@ -90,19 +118,20 @@ Dans la suite, les commandes utilisent `.venv/bin/python`. Si tu as créé
 l'environnement micromamba, remplace `.venv/bin/` par `env/bin/`
 (`./run.sh` choisit tout seul).
 
-### c) Configuration
+### Configuration
 
-```sh
-cp .env.example .env
-```
-
-Les valeurs par défaut conviennent pour démarrer : tu peux ne rien modifier.
+Tout se règle dans le fichier `.env` (créé par `./install.sh` à partir de
+`.env.example`). Les valeurs par défaut conviennent pour démarrer : tu peux
+ne rien modifier.
 
 ## 2. Lancement
 
 ```sh
 ./run.sh
 ```
+
+Sur Mac, tu peux aussi double-cliquer sur `Lancer.command` dans le Finder :
+il démarre le serveur et ouvre la page tout seul.
 
 Puis ouvre <http://127.0.0.1:8000>. Dépose un ou plusieurs CV et clique sur
 « Standardiser ». Une barre montre l'avancement de chaque CV. Une fois un CV
@@ -116,6 +145,11 @@ prêt, quatre onglets :
   du modèle ;
 - **Corriger** : un formulaire pour rectifier le résultat. « Enregistrer et
   régénérer » refait le PDF, la diapositive et le JSON en quelques secondes.
+
+Si une photo a été trouvée dans le CV, elle apparaît en vignette à côté du
+nom. Le programme peut se tromper d'image (un logo carré, par exemple) : dans
+l'onglet « Corriger », le bouton « Retirer la photo de la diapositive » la
+remplace par les initiales.
 
 Sous chaque CV, trois boutons de téléchargement : **PDF**, **PowerPoint**
 et **JSON**. « Tout télécharger (ZIP) » regroupe les trois formats de tout
@@ -256,12 +290,17 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 | `app/coverage.py` | Deux contrôles sans LLM : lignes oubliées, valeurs inventées |
 | `app/render.py` | CV validé → HTML (Jinja2) → PDF (WeasyPrint ou navigateur) |
 | `app/templates/cv.html` | Le modèle visuel du CV standardisé |
-| `app/slides.py` | CV validé → une diapositive PowerPoint (python-pptx) |
+| `app/photo.py` | Retrouve la photo du candidat dans le fichier, sans LLM |
+| `app/slides.py` | CV validé + photo → une diapositive PowerPoint (python-pptx) |
 | `app/batch.py` | La file d'attente : traite les CV un par un, enregistre les corrections |
 | `app/main.py` | Les routes HTTP (FastAPI) |
 | `app/static/index.html` | La page web |
 | `app/timing.py` | Le chronomètre par étape et les logs |
 | `app/bench.py` | Mesure de vitesse en ligne de commande |
+| `app/check.py` | Diagnostic de l'installation (`python -m app.check`) |
+| `install.sh`, `run.sh`, `Lancer.command` | Installer, lancer, lancer d'un double-clic (Mac) |
+| `Dockerfile`, `docker-compose.yml` | Déploiement sur un serveur Linux (non essayé) |
+| `requirements.txt`, `requirements.lock` | Les bibliothèques ; les versions exactes testées |
 | `samples/` | Les faux CV et le script qui les fabrique |
 | `tests/` | Les tests pytest |
 
@@ -279,9 +318,57 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
   la résolution des noms de domaine échoue toujours, et toute connexion est
   dirigée vers un proxy qui n'existe pas. Ce blocage repose sur les options
   du navigateur ; il n'a pas été contrôlé avec un outil d'écoute réseau.
+- La photo du candidat est gardée en mémoire (pas dans un fichier à part)
+  et placée dans la diapositive. La détection de visage est celle de macOS :
+  elle tourne sur la machine.
+- Le serveur ne garde en mémoire que les 30 derniers lots ; les fichiers des
+  lots plus anciens restent dans `outputs/`.
 - `outputs/`, `logs/` et `.env` sont exclus de git.
 
-## 9. Limites connues
+## 9. Déployer sur une autre machine
+
+L'application n'a **pas de mot de passe** : quiconque peut ouvrir la page peut
+envoyer et lire des CV. Elle est faite pour tourner sur la machine de la
+personne qui s'en sert, ou sur un serveur joignable seulement par un accès
+protégé (VPN, reverse proxy avec authentification). Ne l'expose jamais telle
+quelle sur Internet.
+
+### Sur un autre Mac
+
+```sh
+git clone <adresse du dépôt> cv-standardizer   # ou copie du dossier, sans .venv/ ni outputs/
+cd cv-standardizer
+./install.sh
+./run.sh
+```
+
+C'est le parcours qui a été essayé de bout en bout (copie neuve du dépôt,
+installation, traitement d'un CV).
+
+Pour que d'autres postes du même réseau local y accèdent :
+`HOST=0.0.0.0 ./run.sh`, puis `http://<adresse-du-mac>:8000` depuis les
+autres postes. Tous ceux qui sont sur ce réseau peuvent alors lire les CV.
+
+### Sur un serveur Linux, avec Docker
+
+```sh
+docker compose up --build -d
+docker compose exec ollama ollama pull gemma3:4b    # une seule fois
+docker compose exec app python -m app.check         # diagnostic
+```
+
+Puis <http://127.0.0.1:8000> depuis le serveur. Sous Linux, l'OCR passe par
+Tesseract et le PDF par WeasyPrint, installés dans l'image.
+
+**Non essayé** : Docker n'est pas installé sur la machine de développement.
+Ni les deux fichiers Docker, ni les chemins Tesseract et WeasyPrint n'ont
+tourné une seule fois. Attends-toi à devoir ajuster, et commence par le
+diagnostic.
+
+Sans carte graphique, compte sur une vitesse du même ordre que sur un Mac
+Intel (une à deux minutes par CV).
+
+## 10. Limites connues
 
 - Un petit modèle peut oublier une ligne, mal ranger une information ou
   ajouter un détail : relis le résultat avant de t'en servir. Deux
@@ -302,6 +389,12 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 - La diapositive a été contrôlée avec l'aperçu de macOS (Quick Look), pas
   dans PowerPoint ni Keynote, absents de la machine de développement.
 - La page n'affiche pas d'aperçu de la diapositive : il faut la télécharger.
+- La photo est choisie d'après la forme des images (portrait ou carré, ni
+  minuscule ni très large) et, sur Mac, d'après la présence d'un visage. Elle
+  peut être fausse (logo pris pour une photo) ou manquer (photo de profil,
+  très petite, ou dans un format que le programme ne lit pas). On peut la
+  retirer, pas encore en ajouter une à la main.
+- Le PDF ne contient pas la photo : seul le modèle de diapositive l'utilise.
 - Le provider `gemini` n'a pas été essayé avec une vraie clé : seul son
   format de requête est couvert par les tests.
 - Un CV très long est coupé à `MAX_CV_CHARS` caractères (un avertissement s'affiche).

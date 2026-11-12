@@ -1,0 +1,12 @@
+# Ce qui ne doit pas entrer dans l'image Docker.
+.git
+.env
+.venv
+env
+outputs
+logs
+tests
+__pycache__
+*.pyc
+.pytest_cache
+.DS_Store

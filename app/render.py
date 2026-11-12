@@ -8,6 +8,8 @@ Deux moteurs PDF : WeasyPrint (qui a besoin de la bibliothèque Pango) et, à
 défaut, un navigateur de la famille Chrome déjà installé sur la machine.
 """
 
+import contextlib
+import io
 import re
 import shutil
 import subprocess
@@ -109,8 +111,12 @@ def pdf_available() -> bool:
 @lru_cache
 def weasyprint_available() -> bool:
     """WeasyPrint peut-il se charger ? (lru_cache : on ne fait le test qu'une fois.)"""
+    # Quand Pango manque, WeasyPrint affiche un long message en anglais avant
+    # d'échouer. On le fait taire : notre propre message est plus utile.
+    silence = io.StringIO()
     try:
-        import weasyprint  # noqa: F401
+        with contextlib.redirect_stdout(silence), contextlib.redirect_stderr(silence):
+            import weasyprint  # noqa: F401
     except (ImportError, OSError):
         return False
     return True

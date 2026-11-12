@@ -11,10 +11,10 @@ pydantic-settings
 httpx
 
 # Extraction du texte
-pymupdf               # PDF
-python-docx           # DOCX
+pymupdf>=1.24         # PDF
+python-docx>=1.1      # DOCX
 pytesseract           # pont Python vers le programme Tesseract (OCR)
-pillow                # images, pour l'OCR
+pillow                # images : OCR, photo du candidat
 # OCR intégré à macOS, utilisé quand Tesseract n'est pas installé.
 # (La fin de ligne signifie : "à installer seulement sur Mac".)
 pyobjc-framework-Vision; sys_platform == "darwin"
@@ -23,7 +23,7 @@ pyobjc-framework-Vision; sys_platform == "darwin"
 jinja2
 weasyprint            # HTML -> PDF (a besoin de la bibliothèque système Pango ;
                       # sans elle, l'application passe par Chrome)
-python-pptx           # la diapositive PowerPoint (.pptx)
+python-pptx>=1.0      # la diapositive PowerPoint (.pptx)
 
 # Tests
 pytest

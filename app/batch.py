@@ -76,6 +76,12 @@ def slugify(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "_", ascii_text).strip("_")[:60] or "sans_nom"
 
 
+# Un serveur qui tourne des semaines ne doit pas garder tous les lots en
+# mémoire (textes, photos...). Au-delà de ce nombre, les plus anciens lots
+# terminés sont oubliés. Leurs fichiers restent dans outputs/.
+MAX_JOBS_IN_MEMORY = 30
+
+
 @contextmanager
 def keep_awake() -> Iterator[Optional[subprocess.Popen]]:
     """Empêche le Mac de se mettre en veille pendant le bloc `with`.
@@ -116,8 +122,15 @@ class JobQueue:
         items = [Item(index=i, filename=name, data=data) for i, (name, data) in enumerate(files)]
         job = Job(id=uuid.uuid4().hex[:12], items=items)
         self._jobs[job.id] = job
+        self._forget_old_jobs()
         self._queue.put(job)
         return job
+
+    def _forget_old_jobs(self) -> None:
+        # Un dictionnaire Python garde l'ordre d'ajout : les premiers sont les plus anciens.
+        finished = [job for job in self._jobs.values() if job.finished.is_set()]
+        while len(self._jobs) > MAX_JOBS_IN_MEMORY and finished:
+            del self._jobs[finished.pop(0).id]
 
     def get(self, job_id: str) -> Optional[Job]:
         return self._jobs.get(job_id)
