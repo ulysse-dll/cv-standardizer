@@ -1,0 +1,54 @@
+"""Tests de la génération du CV standardisé (HTML, et PDF si WeasyPrint fonctionne)."""
+
+import pytest
+
+from app.render import detect_language, pdf_available, period, render_html, render_pdf
+from app.schema import CV
+from tests.test_schema import VALID_CV
+
+
+def test_html_contains_the_cv_content():
+    html = render_html(CV.model_validate(VALID_CV))
+    for expected in ("Camille Lefèvre", "Novalys", "Master Informatique", "FastAPI", "Anglais (C1)"):
+        assert expected in html
+    assert "Expériences professionnelles" in html  # CV français -> rubriques en français
+    assert "03/2021 – aujourd&#39;hui" in html  # "present" est affiché dans la langue du CV
+
+
+def test_english_cv_gets_english_headings():
+    cv = CV.model_validate(
+        {
+            "identity": {"full_name": "Daniel Okafor"},
+            "summary": "Data analyst with 5 years of experience in the retail sector.",
+            "experiences": [{"job_title": "Data Analyst", "highlights": ["Built the weekly dashboard for the team"]}],
+        }
+    )
+    assert detect_language(cv) == "en"
+    assert "Experience" in render_html(cv)
+
+
+def test_empty_sections_are_hidden():
+    html = render_html(CV.model_validate({"identity": {"full_name": "Jean Dupont"}}))
+    assert "Jean Dupont" in html
+    assert "<h2>" not in html  # aucune rubrique vide
+
+
+def test_html_in_the_cv_is_neutralized():
+    # Un CV piégé ne doit pas pouvoir injecter de script dans l'aperçu.
+    cv = CV.model_validate({"identity": {"full_name": "<script>alert(1)</script>"}})
+    html = render_html(cv)
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_period_formats():
+    assert period("2019", "2021") == "2019 – 2021"
+    assert period("2019", None) == "2019"
+    assert period(None, None) == ""
+    assert period("01/2022", "present", "aujourd'hui") == "01/2022 – aujourd'hui"
+
+
+@pytest.mark.skipif(not pdf_available(), reason="WeasyPrint ne trouve pas Pango")
+def test_pdf_is_generated():
+    pdf = render_pdf(render_html(CV.model_validate(VALID_CV)))
+    assert pdf.startswith(b"%PDF")

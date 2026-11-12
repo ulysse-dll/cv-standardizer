@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schema import CV, cv_json_schema
+from app.schema import CV, cv_json_schema, normalize_date
 
 VALID_CV = {
     "identity": {
@@ -84,6 +84,39 @@ def test_values_are_cleaned():
     assert cv.title is None
     assert cv.skills == ["Python", "SQL"]
     assert cv.languages == []
+
+
+@pytest.mark.parametrize(
+    "written, expected",
+    [
+        ("Mars 2021", "03/2021"),
+        ("Sept. 2018", "09/2018"),
+        ("février 2018", "02/2018"),
+        ("Jan 2022", "01/2022"),
+        ("depuis janvier 2019", "01/2019"),
+        ("3/2021", "03/2021"),
+        ("2021-03", "03/2021"),
+        ("2018", "2018"),
+        ("aujourd'hui", "present"),
+        ("Present", "present"),
+        ("En cours", "present"),
+        ("été 2019", "été 2019"),  # non reconnue : on n'y touche pas
+    ],
+)
+def test_dates_are_normalized(written, expected):
+    assert normalize_date(written) == expected
+
+
+def test_dates_are_normalized_inside_a_cv():
+    cv = CV.model_validate(
+        {
+            "identity": {"full_name": "Jean Dupont"},
+            "experiences": [{"job_title": "Dev", "start": "Mars 2021", "end": "aujourd'hui"}],
+            "certifications": [{"name": "AWS", "date": "juin 2022"}],
+        }
+    )
+    assert (cv.experiences[0].start, cv.experiences[0].end) == ("03/2021", "present")
+    assert cv.certifications[0].date == "06/2022"
 
 
 def test_invalid_json_text_is_rejected():

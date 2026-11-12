@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<title>CV - {{ cv.identity.full_name }}</title>
+<style>
+  /* Mise en page papier (lue par WeasyPrint pour le PDF) */
+  @page { size: A4; margin: 15mm 16mm; }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10pt; line-height: 1.4; color: #1f2933; margin: 0;
+  }
+  header { border-bottom: 2px solid #1f4e79; padding-bottom: 8pt; margin-bottom: 4pt; }
+  h1 { font-size: 22pt; margin: 0; color: #1f4e79; letter-spacing: 0.3pt; }
+  .title { font-size: 12pt; margin: 2pt 0 5pt 0; color: #3e4c59; }
+  .contact { font-size: 9pt; color: #52606d; }
+  .contact span + span::before { content: "  ·  "; }
+
+  h2 {
+    font-size: 10pt; text-transform: uppercase; letter-spacing: 1pt; color: #1f4e79;
+    border-bottom: 0.5pt solid #cbd2d9; padding-bottom: 2pt; margin: 13pt 0 6pt 0;
+  }
+  .entry { margin-bottom: 7pt; page-break-inside: avoid; }
+  .entry-head { display: flex; justify-content: space-between; gap: 10pt; }
+  .entry-main { font-weight: 600; }
+  .entry-sub { font-weight: 400; color: #3e4c59; }
+  .entry-dates { color: #52606d; font-size: 9pt; white-space: nowrap; }
+  ul { margin: 2pt 0 0 0; padding-left: 13pt; }
+  li { margin-bottom: 1pt; }
+  p { margin: 0; }
+  .tags { margin: 0; padding: 0; list-style: none; }
+  .tags li {
+    display: inline-block; border: 0.5pt solid #9aa5b1; border-radius: 3pt;
+    padding: 1pt 5pt; margin: 0 3pt 3pt 0; font-size: 9pt;
+  }
+
+  /* Uniquement à l'écran (aperçu dans le navigateur) : une "feuille" centrée */
+  @media screen {
+    html { background: #e4e7eb; }
+    body { background: #fff; max-width: 210mm; margin: 12px auto; padding: 15mm 16mm; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>{{ cv.identity.full_name }}</h1>
+  {% if cv.title %}<p class="title">{{ cv.title }}</p>{% endif %}
+  <p class="contact">
+    {% if cv.identity.location %}<span>{{ cv.identity.location }}</span>{% endif %}
+    {% if cv.identity.phone %}<span>{{ cv.identity.phone }}</span>{% endif %}
+    {% if cv.identity.email %}<span>{{ cv.identity.email }}</span>{% endif %}
+    {% for link in cv.identity.links %}<span>{{ link }}</span>{% endfor %}
+  </p>
+</header>
+
+{% if cv.summary %}
+<section>
+  <h2>{{ labels.summary }}</h2>
+  <p>{{ cv.summary }}</p>
+</section>
+{% endif %}
+
+{% if cv.experiences %}
+<section>
+  <h2>{{ labels.experiences }}</h2>
+  {% for job in cv.experiences %}
+  <div class="entry">
+    <div class="entry-head">
+      <span class="entry-main">{{ job.job_title }}{% if job.company %}<span class="entry-sub"> — {{ job.company }}{% if job.location %}, {{ job.location }}{% endif %}</span>{% endif %}</span>
+      <span class="entry-dates">{{ period(job.start, job.end) }}</span>
+    </div>
+    {% if job.highlights %}
+    <ul>{% for line in job.highlights %}<li>{{ line }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if cv.education %}
+<section>
+  <h2>{{ labels.education }}</h2>
+  {% for study in cv.education %}
+  <div class="entry">
+    <div class="entry-head">
+      <span class="entry-main">{{ study.degree }}{% if study.school %}<span class="entry-sub"> — {{ study.school }}</span>{% endif %}</span>
+      <span class="entry-dates">{{ period(study.start, study.end) }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if cv.skills %}
+<section>
+  <h2>{{ labels.skills }}</h2>
+  <ul class="tags">{% for skill in cv.skills %}<li>{{ skill }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if cv.languages %}
+<section>
+  <h2>{{ labels.languages }}</h2>
+  <p>{% for language in cv.languages %}{{ language.name }}{% if language.level %} ({{ language.level }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+</section>
+{% endif %}
+
+{% if cv.certifications %}
+<section>
+  <h2>{{ labels.certifications }}</h2>
+  {% for certification in cv.certifications %}
+  <div class="entry">
+    <div class="entry-head">
+      <span class="entry-main">{{ certification.name }}{% if certification.issuer %}<span class="entry-sub"> — {{ certification.issuer }}</span>{% endif %}</span>
+      <span class="entry-dates">{{ certification.date or "" }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+</body>
+</html>

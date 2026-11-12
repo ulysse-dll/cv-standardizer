@@ -5,9 +5,11 @@ Ces classes Pydantic servent trois fois :
 2. on valide la réponse du LLM avec (types, champs obligatoires) ;
 3. on les donne au template HTML pour générer le CV final.
 
-Choix pour un petit modèle : peu de niveaux et des dates en texte libre.
+Choix pour un petit modèle : peu de niveaux, et des dates en texte libre que
+l'on uniformise ensuite nous-mêmes en Python (voir normalize_date).
 """
 
+import re
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -27,6 +29,52 @@ def _clean(value: Any) -> Any:
     return value
 
 
+_MONTHS = {
+    "janvier": 1, "janv": 1, "jan": 1, "january": 1,
+    "février": 2, "fevrier": 2, "févr": 2, "fév": 2, "fev": 2, "feb": 2, "february": 2,
+    "mars": 3, "mar": 3, "march": 3,
+    "avril": 4, "avr": 4, "apr": 4, "april": 4,
+    "mai": 5, "may": 5,
+    "juin": 6, "jun": 6, "june": 6,
+    "juillet": 7, "juil": 7, "jul": 7, "july": 7,
+    "août": 8, "aout": 8, "aug": 8, "august": 8,
+    "septembre": 9, "sept": 9, "sep": 9, "september": 9,
+    "octobre": 10, "oct": 10, "october": 10,
+    "novembre": 11, "nov": 11, "november": 11,
+    "décembre": 12, "decembre": 12, "déc": 12, "dec": 12, "december": 12,
+}
+_PRESENT_WORDS = {
+    "present", "présent", "aujourd'hui", "aujourd’hui", "actuel", "actuellement", "en cours",
+    "en poste", "à ce jour", "now", "current", "currently", "today", "ongoing",
+}
+_DATE_FIELDS = {"start", "end", "date"}
+
+
+def normalize_date(value: Any) -> Any:
+    """Uniformise une date : "Mars 2021" -> "03/2021", "aujourd'hui" -> "present".
+
+    C'est fait ici, en Python, plutôt que demandé au LLM : c'est gratuit,
+    instantané, et ça donne toujours le même résultat. Une date qu'on ne
+    reconnaît pas est laissée telle quelle.
+    """
+    if not isinstance(value, str):
+        return value
+    text = value.lower().rstrip(".")
+    text = re.sub(r"^(depuis|since|from)\s+", "", text)  # "depuis janvier 2019"
+    if text in _PRESENT_WORDS:
+        return "present"
+    match = re.fullmatch(r"([a-zéûôèç]+)\.?,? (\d{4})", text)  # "mars 2021", "Sept. 2018"
+    if match and match.group(1) in _MONTHS:
+        return f"{_MONTHS[match.group(1)]:02d}/{match.group(2)}"
+    match = re.fullmatch(r"(\d{1,2}) ?[/.-] ?(\d{4})", text)  # "3/2021", "03-2021"
+    if match and 1 <= int(match.group(1)) <= 12:
+        return f"{int(match.group(1)):02d}/{match.group(2)}"
+    match = re.fullmatch(r"(\d{4}) ?[/.-] ?(\d{1,2})", text)  # "2021-03"
+    if match and 1 <= int(match.group(2)) <= 12:
+        return f"{int(match.group(2)):02d}/{match.group(1)}"
+    return value
+
+
 class CleanModel(BaseModel):
     """Classe de base : nettoie toutes les valeurs AVANT la validation."""
 
@@ -39,11 +87,12 @@ class CleanModel(BaseModel):
 
     @field_validator("*", mode="before")
     @classmethod
-    def _none_to_empty_list(cls, value: Any, info: Any) -> Any:
-        """Si le LLM écrit null à la place d'une liste, on met une liste vide."""
-        field = cls.model_fields[info.field_name]
-        if value is None and field.default_factory is list:
+    def _fix_field(cls, value: Any, info: Any) -> Any:
+        # Si le LLM écrit null à la place d'une liste, on met une liste vide.
+        if value is None and cls.model_fields[info.field_name].default_factory is list:
             return []
+        if info.field_name in _DATE_FIELDS:
+            return normalize_date(value)
         return value
 
 
