@@ -133,9 +133,18 @@ startButton.addEventListener("click", async () => {
     return;
   }
   const job = await response.json();
+  // On note le job dans l'adresse de la page : si on la recharge, on le retrouve.
+  history.replaceState(null, "", `?job=${job.job_id}`);
   render(job);
   pollTimer = setInterval(() => poll(job.job_id), 2000);  // toutes les 2 secondes
 });
+
+// ---------- 3 bis. reprise d'un job existant : adresse /?job=<identifiant> ----------
+const existingJob = new URLSearchParams(location.search).get("job");
+if (existingJob) {
+  poll(existingJob);
+  pollTimer = setInterval(() => poll(existingJob), 2000);
+}
 
 // ---------- 4. suivi de l'avancement ----------
 async function poll(jobId) {
