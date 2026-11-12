@@ -10,7 +10,8 @@ SYSTEM_PROMPT = """You convert a CV into JSON.
 Rules:
 - Copy facts from the CV only. Never invent. Unknown value: null.
 - Keep the CV's language. Do not translate.
-- Include every job (internships too) and every degree, most recent first.
+- experiences: every job and internship in the CV, newest first.
+- education: every degree in the CV, newest first.
 - Dates: "MM/YYYY" or "YYYY".
 - highlights: the job's bullet points, max 4 per job.
 - skills: short keywords only.

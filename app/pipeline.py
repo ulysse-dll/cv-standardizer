@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.coverage import find_missing_lines
 from app.extraction import ExtractionResult, extract_text
 from app.llm.base import LLMProvider
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
@@ -94,6 +95,12 @@ def process_cv(data: bytes, filename: str, provider: LLMProvider, settings: Sett
     logger.info("[%s] %s, %d page(s), %d caractères", filename, extraction.method, extraction.pages, len(text))
 
     cv, attempts = structure_cv(text, provider, timer)
+
+    missing = find_missing_lines(text, cv)
+    if missing:
+        quoted = " ; ".join(f"« {line} »" for line in missing)
+        warnings.append(f"À vérifier : ces lignes du CV d'origine ne se retrouvent pas dans le résultat : {quoted}")
+        logger.warning("[%s] %d ligne(s) peut-être oubliée(s) par le modèle", filename, len(missing))
 
     with timer.step("html"):
         html = render_html(cv)
