@@ -6,6 +6,7 @@ import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
+from pptx import Presentation
 
 from app import batch
 from app.config import Settings
@@ -53,6 +54,11 @@ def test_process_one_cv(client, samples_dir):
     assert body["cv"]["identity"]["full_name"] == "Inès Benali"
     assert body["status"] == "done"
     assert "llm" in body["timings"]
+    # La diapositive PowerPoint se télécharge, avec le bon type de fichier.
+    slide_file = client.get(body["links"]["pptx"])
+    assert slide_file.status_code == 200
+    assert "presentationml" in slide_file.headers["content-type"]
+    assert slide_file.content.startswith(b"PK")
     # L'aperçu HTML est servi, et contient le nom.
     assert "Inès Benali" in client.get(body["links"]["html"]).text
 
@@ -122,7 +128,10 @@ def test_correction_is_saved_and_documents_are_rebuilt(client, samples_dir):
     assert "Inès Benali-Martin" in client.get(f"{url}/html").text
     # Les fichiers ont été renommés : il ne reste qu'une version dans le ZIP.
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/api/batch/{body['job_id']}/zip").content))
-    assert archive.namelist() == ["01_CV_Ines_Benali_Martin.json"]
+    assert sorted(archive.namelist()) == ["01_CV_Ines_Benali_Martin.json", "01_CV_Ines_Benali_Martin.pptx"]
+    # La diapositive a été refaite avec le nom corrigé.
+    slide = Presentation(io.BytesIO(client.get(f"{url}/pptx").content)).slides[0]
+    assert "Inès Benali-Martin" in "\n".join(shape.text_frame.text for shape in slide.shapes if shape.has_text_frame)
 
 
 def test_invalid_correction_is_refused_and_changes_nothing(client, samples_dir):

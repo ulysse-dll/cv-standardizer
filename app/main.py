@@ -9,7 +9,7 @@ Routes :
     POST /api/process                       1 CV, la réponse arrive quand il est traité
     POST /api/batch                         plusieurs CV, répond tout de suite (job)
     GET  /api/batch/{job}                   avancement du job
-    GET  /api/batch/{job}/items/{n}/{kind}  un résultat (kind = html, json ou pdf)
+    GET  /api/batch/{job}/items/{n}/{kind}  un résultat (kind = html, json, pdf ou pptx)
     GET  /api/batch/{job}/items/{n}/text    le texte extrait du fichier d'origine
     PUT  /api/batch/{job}/items/{n}         enregistre un CV corrigé à la main
     GET  /api/batch/{job}/zip               tous les résultats dans un ZIP
@@ -38,7 +38,12 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 MAX_FILE_BYTES = 15 * 1024 * 1024  # 15 Mo par fichier
 MAX_FILES_PER_BATCH = 50
-MEDIA_TYPES = {"html": "text/html; charset=utf-8", "json": "application/json", "pdf": "application/pdf"}
+MEDIA_TYPES = {
+    "html": "text/html; charset=utf-8",
+    "json": "application/json",
+    "pdf": "application/pdf",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
 
 
 def create_app(
@@ -107,6 +112,7 @@ def create_app(
                 "html": f"{base_url}/html" if done else None,
                 "json": f"{base_url}/json" if done else None,
                 "pdf": f"{base_url}/pdf" if done and item.has_pdf else None,
+                "pptx": f"{base_url}/pptx" if done else None,
             },
         }
 
@@ -190,13 +196,13 @@ def create_app(
 
     @app.get("/api/batch/{job_id}/zip")
     def download_zip(job_id: str) -> Response:
-        """Tous les PDF et JSON du job dans une archive ZIP."""
+        """Tous les PDF, diapositives et JSON du job dans une archive ZIP."""
         job = find_job(job_id)
         folder = app.state.jobs.job_dir(job)
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             for item in job.items:
-                for extension in ("pdf", "json"):
+                for extension in ("pdf", "pptx", "json"):
                     path = folder / f"{item.output_stem}.{extension}"
                     if item.status == "done" and path.exists():
                         archive.write(path, path.name)

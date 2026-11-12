@@ -23,6 +23,7 @@ pyobjc-framework-Vision; sys_platform == "darwin"
 jinja2
 weasyprint            # HTML -> PDF (a besoin de la bibliothèque système Pango ;
                       # sans elle, l'application passe par Chrome)
+python-pptx           # la diapositive PowerPoint (.pptx)
 
 # Tests
 pytest

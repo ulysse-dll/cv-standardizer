@@ -148,7 +148,7 @@
         <div id="pane-edit" class="card" hidden>
           <div class="editor-bar">
             <button id="save" class="primary">Enregistrer et régénérer</button>
-            <span id="edit-message" class="muted">Corrige ce que le modèle a mal lu. Aucun LLM n'est relancé : c'est immédiat.</span>
+            <span id="edit-message" class="muted">Corrige ce que le modèle a mal lu. Le PDF et la diapositive sont refaits sans relancer le LLM.</span>
           </div>
           <div id="form"></div>
         </div>
@@ -176,7 +176,7 @@ let originalUrl = null; // adresse temporaire du PDF d'origine affiché
 let readForm = null;    // fonction qui relit le formulaire de correction
 
 const STATUS_LABELS = { pending: "en attente", running: "en cours", done: "terminé", error: "erreur" };
-const STEP_LABELS = { extraction: "lecture", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF" };
+const STEP_LABELS = { extraction: "lecture", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF", pptx: "PowerPoint" };
 const METHOD_LABELS = { "pdf-text": "PDF texte", "pdf-ocr": "PDF scanné (OCR)", docx: "DOCX" };
 const seconds = (value) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " s";
 
@@ -348,7 +348,7 @@ function renderList() {
       line.append(element("div", "detail", notes.filter(Boolean).join(" · ")));
 
       const links = element("div", "links");
-      for (const [kind, label, primary] of [["pdf", "Télécharger le PDF", true], ["json", "JSON", false]]) {
+      for (const [kind, label, primary] of [["pdf", "PDF", true], ["pptx", "PowerPoint", true], ["json", "JSON", false]]) {
         if (!item.links[kind]) continue;
         const link = element("a", primary ? "button primary" : "button", label);
         link.href = item.links[kind];
@@ -415,7 +415,7 @@ function renderPane() {
     fetch(`${base}/text`).then((r) => r.text()).then((text) => { $("source-text").textContent = text; });
   } else if (tab === "edit") {
     $("form").replaceChildren();
-    setEditMessage("Corrige ce que le modèle a mal lu. Aucun LLM n'est relancé : c'est immédiat.", "muted");
+    setEditMessage("Corrige ce que le modèle a mal lu. Le PDF et la diapositive sont refaits sans relancer le LLM.", "muted");
     fetch(`${base}/json?v=${versions[selected] || 0}`).then((r) => r.json()).then(buildForm);
   }
 }

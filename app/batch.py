@@ -31,6 +31,7 @@ from app.llm.base import LLMError, LLMProvider
 from app.pipeline import StructuringError, process_cv
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV
+from app.slides import render_pptx
 from app.timing import logger
 
 
@@ -147,7 +148,7 @@ class JobQueue:
             item.timings = result.timings
             item.warnings = result.warnings
             item.source_text = result.source_text
-            self._save(job, item, result.html, result.pdf)
+            self._save(job, item, result.html, result.pdf, result.pptx)
             item.status = "done"
         except (ExtractionError, LLMError, StructuringError) as error:
             # Erreurs "prévues" : leur message est écrit pour l'utilisateur.
@@ -162,28 +163,31 @@ class JobQueue:
 
     # ------------------------------------------- correction à la main ---
     def update_cv(self, job: Job, item: Item, cv: CV) -> None:
-        """Remplace le CV d'un item par une version corrigée, et refait HTML et PDF.
+        """Remplace le CV d'un item par une version corrigée, et refait HTML, PDF et diapositive.
 
-        Aucun LLM ici : c'est instantané (à part le PDF, une à deux secondes).
+        Aucun LLM ici : c'est rapide (quelques secondes, surtout pour le PDF).
         """
         html = render_html(cv)
         # Les alertes « À vérifier » concernaient la version du modèle : elles tombent.
-        warnings = [w for w in item.warnings if not w.startswith(("À vérifier", "Génération PDF"))]
+        outdated = ("À vérifier", "Génération PDF", "Diapositive")
+        warnings = [w for w in item.warnings if not w.startswith(outdated)]
         pdf = None
         try:
             pdf = render_pdf(html)
         except PDFUnavailableError as error:
             warnings.append(str(error))
+        pptx, slide_notes = render_pptx(cv)
+        warnings.extend(f"Diapositive : {note}." for note in slide_notes)
 
         # Si le nom du candidat a été corrigé, le nom des fichiers change :
         # on supprime les anciens pour ne pas laisser deux versions.
         folder = self.job_dir(job)
-        for extension in ("json", "html", "pdf"):
+        for extension in ("json", "html", "pdf", "pptx"):
             (folder / f"{item.output_stem}.{extension}").unlink(missing_ok=True)
         item.cv, item.warnings, item.has_pdf, item.edited = cv, warnings, False, True
-        self._save(job, item, html, pdf)
+        self._save(job, item, html, pdf, pptx)
 
-    def _save(self, job: Job, item: Item, html: str, pdf: Optional[bytes]) -> None:
+    def _save(self, job: Job, item: Item, html: str, pdf: Optional[bytes], pptx: bytes) -> None:
         """Écrit les fichiers produits dans outputs/<job>/."""
         folder = self.job_dir(job)
         folder.mkdir(parents=True, exist_ok=True)
@@ -193,6 +197,7 @@ class JobQueue:
             item.cv.model_dump_json(indent=2), encoding="utf-8"
         )
         (folder / f"{item.output_stem}.html").write_text(html, encoding="utf-8")
+        (folder / f"{item.output_stem}.pptx").write_bytes(pptx)
         if pdf is not None:
             (folder / f"{item.output_stem}.pdf").write_bytes(pdf)
             item.has_pdf = True

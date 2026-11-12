@@ -8,12 +8,16 @@ Internet (par défaut).
 ```
 fichier ──► 1. extraction du texte ──► 2. LLM ──► 3. validation ──► 4. génération
             PyMuPDF / python-docx       JSON        Pydantic          HTML ─► PDF
-            OCR si le PDF est scanné    forcé       + 1 retry         + export JSON
-            (aucun LLM ici)                         + 2 contrôles
+            OCR si le PDF est scanné    forcé       + 1 retry         + diapo PowerPoint
+            (aucun LLM ici)                         + 2 contrôles     + export JSON
 ```
 
+Chaque CV ressort en trois fichiers : un **PDF** d'une page A4, une
+**diapositive PowerPoint** (`.pptx`, une seule diapo 16:9, modifiable) et un
+**JSON**.
+
 Après le passage du modèle, tu peux **corriger le résultat à la main** dans
-la page : le HTML et le PDF sont refaits aussitôt, sans relancer le LLM.
+la page : le PDF et la diapositive sont refaits aussitôt, sans relancer le LLM.
 
 ## 1. Installation
 
@@ -111,7 +115,11 @@ prêt, quatre onglets :
   modèle a reçu. Pratique pour savoir si une erreur vient de la lecture ou
   du modèle ;
 - **Corriger** : un formulaire pour rectifier le résultat. « Enregistrer et
-  régénérer » refait le HTML, le PDF et le JSON en quelques secondes.
+  régénérer » refait le PDF, la diapositive et le JSON en quelques secondes.
+
+Sous chaque CV, trois boutons de téléchargement : **PDF**, **PowerPoint**
+et **JSON**. « Tout télécharger (ZIP) » regroupe les trois formats de tout
+le lot.
 
 Ollama doit tourner (l'application Ollama ouverte, ou `ollama serve`).
 
@@ -131,7 +139,11 @@ curl -F "files=@samples/cv_classique_fr.pdf" -F "files=@samples/cv_tableaux_fr.d
 curl http://127.0.0.1:8000/api/batch/<job_id>
 curl -OJ http://127.0.0.1:8000/api/batch/<job_id>/zip
 
-# corriger un résultat : on renvoie le JSON modifié (ici celui du 1er CV, numéro 0)
+# un fichier précis : pdf, pptx ou json (ici ceux du 1er CV, numéro 0)
+curl -OJ http://127.0.0.1:8000/api/batch/<job_id>/items/0/pdf
+curl -OJ http://127.0.0.1:8000/api/batch/<job_id>/items/0/pptx
+
+# corriger un résultat : on renvoie le JSON modifié
 curl -o cv.json http://127.0.0.1:8000/api/batch/<job_id>/items/0/json
 curl -X PUT -H "Content-Type: application/json" -d @cv.json \
      http://127.0.0.1:8000/api/batch/<job_id>/items/0
@@ -244,6 +256,7 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 | `app/coverage.py` | Deux contrôles sans LLM : lignes oubliées, valeurs inventées |
 | `app/render.py` | CV validé → HTML (Jinja2) → PDF (WeasyPrint ou navigateur) |
 | `app/templates/cv.html` | Le modèle visuel du CV standardisé |
+| `app/slides.py` | CV validé → une diapositive PowerPoint (python-pptx) |
 | `app/batch.py` | La file d'attente : traite les CV un par un, enregistre les corrections |
 | `app/main.py` | Les routes HTTP (FastAPI) |
 | `app/static/index.html` | La page web |
@@ -282,6 +295,13 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
   CV d'une page. La barre de progression est une estimation.
 - L'export PDF par le navigateur prend de 1 à 6 secondes selon les moments,
   sans cause identifiée.
+- La diapositive n'a qu'une page. Pour un CV long, la police est réduite
+  (jusqu'à 9 points), puis le nombre de réalisations par poste (un
+  avertissement « Diapositive » le signale). La place prise par le texte est
+  estimée, pas mesurée : sur un CV extrême, le texte peut déborder.
+- La diapositive a été contrôlée avec l'aperçu de macOS (Quick Look), pas
+  dans PowerPoint ni Keynote, absents de la machine de développement.
+- La page n'affiche pas d'aperçu de la diapositive : il faut la télécharger.
 - Le provider `gemini` n'a pas été essayé avec une vraie clé : seul son
   format de requête est couvert par les tests.
 - Un CV très long est coupé à `MAX_CV_CHARS` caractères (un avertissement s'affiche).

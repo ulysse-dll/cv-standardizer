@@ -2,7 +2,7 @@
 
     fichier -> texte (extraction.py) -> JSON (LLM) -> validation Pydantic
             -> 1 nouvel essai si le JSON est invalide -> CV validé
-            -> HTML puis PDF (render.py)
+            -> HTML puis PDF (render.py), diapositive PowerPoint (slides.py)
 
 Chaque étape est chronométrée (timing.py).
 """
@@ -19,6 +19,7 @@ from app.llm.base import LLMProvider, ProgressCallback
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
+from app.slides import render_pptx
 from app.timing import StepTimer, logger
 
 MAX_ATTEMPTS = 2  # 1 essai + 1 retry automatique
@@ -42,6 +43,7 @@ class PipelineResult:
     cv: CV
     html: str  # le CV standardisé, en HTML (sert d'aperçu)
     pdf: Optional[bytes]  # le même en PDF, ou None si WeasyPrint est indisponible
+    pptx: bytes  # le même en une diapositive PowerPoint
     extraction_method: str  # "pdf-text", "pdf-ocr" ou "docx"
     attempts: int  # 1 = bon du premier coup, 2 = il a fallu le retry
     timings: Dict[str, float]  # durée de chaque étape, en secondes
@@ -146,6 +148,10 @@ def process_cv(
             pdf = render_pdf(html)
     except PDFUnavailableError as error:
         warnings.append(str(error))  # pas de PDF, mais le JSON et l'aperçu restent utilisables
+    with timer.step("pptx"):
+        pptx, slide_notes = render_pptx(cv)
+    # Un CV long ne tient pas toujours sur une diapo : on dit ce qui a été raccourci.
+    warnings.extend(f"Diapositive : {note}." for note in slide_notes)
 
     logger.info("[%s] terminé en %.1f s (%d essai(s))", filename, timer.total, attempts)
 
@@ -153,6 +159,7 @@ def process_cv(
         cv=cv,
         html=html,
         pdf=pdf,
+        pptx=pptx,
         extraction_method=extraction.method,
         attempts=attempts,
         timings=dict(timer.steps),
