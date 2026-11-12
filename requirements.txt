@@ -1,0 +1,24 @@
+# Serveur web
+fastapi
+uvicorn
+python-multipart      # nécessaire à FastAPI pour recevoir des fichiers
+
+# Configuration et schéma
+pydantic>=2
+pydantic-settings
+
+# Appels HTTP vers le LLM
+httpx
+
+# Extraction du texte
+pymupdf               # PDF
+python-docx           # DOCX
+pytesseract           # pont Python vers le programme Tesseract (OCR)
+pillow                # images, pour l'OCR
+
+# Génération du CV standardisé
+jinja2
+weasyprint            # HTML -> PDF (a besoin de la bibliothèque système Pango)
+
+# Tests
+pytest

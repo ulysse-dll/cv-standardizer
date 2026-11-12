@@ -1,0 +1,16 @@
+# Secrets et réglages locaux
+.env
+
+# Environnements Python
+.venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Données personnelles : ne jamais les committer
+outputs/
+logs/
+
+# macOS
+.DS_Store
