@@ -90,6 +90,52 @@ def test_batch_processes_every_file_and_keeps_going_after_an_error(client, sampl
     assert json_files == ["01_CV_Ines_Benali.json", "03_CV_Ines_Benali.json"]
 
 
+def test_running_item_exposes_its_progress(client, samples_dir):
+    created = client.post("/api/batch", files=[_upload(samples_dir, "cv_tableaux_fr.docx")]).json()
+    assert {"step", "progress", "edited"} <= set(created["items"][0])
+    job = _wait_until_done(client, created["job_id"])
+    assert job["items"][0]["step"] is None  # plus d'étape en cours une fois terminé
+
+
+def test_source_text_is_served_for_comparison(client, samples_dir):
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    body = client.post("/api/process", files={"file": ("cv_tableaux_fr.docx", data)}).json()
+    text = client.get(f"/api/batch/{body['job_id']}/items/0/text").text
+    assert "Maison Océane" in text
+
+
+def test_correction_is_saved_and_documents_are_rebuilt(client, samples_dir):
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    body = client.post("/api/process", files={"file": ("cv_tableaux_fr.docx", data)}).json()
+    url = f"/api/batch/{body['job_id']}/items/0"
+
+    corrected = body["cv"]
+    corrected["identity"]["full_name"] = "Inès Benali-Martin"
+    corrected["skills"] = ["SEO", "Google Ads"]
+    response = client.put(url, json=corrected)
+
+    assert response.status_code == 200
+    assert response.json()["edited"] is True
+    assert response.json()["name"] == "Inès Benali-Martin"
+    assert client.get(f"{url}/json").json()["skills"] == ["SEO", "Google Ads"]
+    assert "Inès Benali-Martin" in client.get(f"{url}/html").text
+    # Les fichiers ont été renommés : il ne reste qu'une version dans le ZIP.
+    archive = zipfile.ZipFile(io.BytesIO(client.get(f"/api/batch/{body['job_id']}/zip").content))
+    assert archive.namelist() == ["01_CV_Ines_Benali_Martin.json"]
+
+
+def test_invalid_correction_is_refused_and_changes_nothing(client, samples_dir):
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    body = client.post("/api/process", files={"file": ("cv_tableaux_fr.docx", data)}).json()
+    url = f"/api/batch/{body['job_id']}/items/0"
+
+    response = client.put(url, json={"identity": {"full_name": ""}})  # un CV sans nom
+
+    assert response.status_code == 422
+    assert "full_name" in response.json()["detail"]
+    assert client.get(f"{url}/json").json()["identity"]["full_name"] == "Inès Benali"
+
+
 def test_unknown_job_is_a_404(client):
     assert client.get("/api/batch/inconnu").status_code == 404
     assert client.get("/api/batch/inconnu/items/0/json").status_code == 404

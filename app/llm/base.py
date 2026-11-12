@@ -7,7 +7,11 @@ qui rend les providers interchangeables.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
+
+# Une fonction qu'on nous prête pour signaler l'avancement : le provider
+# l'appelle avec le nombre de caractères déjà écrits par le modèle.
+ProgressCallback = Callable[[int], None]
 
 
 class LLMError(Exception):
@@ -28,5 +32,11 @@ class LLMProvider(ABC):
     model: str
 
     @abstractmethod
-    def generate_json(self, system: str, user: str, schema: dict) -> LLMResult:
-        """Envoie les deux messages au modèle et exige une réponse JSON conforme au schéma."""
+    def generate_json(
+        self, system: str, user: str, schema: dict, on_progress: Optional[ProgressCallback] = None
+    ) -> LLMResult:
+        """Envoie les deux messages au modèle et exige une réponse JSON conforme au schéma.
+
+        `on_progress` est facultatif : un provider qui reçoit la réponse d'un
+        seul bloc peut l'ignorer.
+        """

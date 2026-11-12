@@ -6,11 +6,11 @@ Le schéma JSON passe par le champ `response_format`.
 """
 
 import copy
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
-from app.llm.base import LLMError, LLMProvider, LLMResult
+from app.llm.base import LLMError, LLMProvider, LLMResult, ProgressCallback
 
 
 def inline_refs(schema: dict) -> dict:
@@ -43,7 +43,10 @@ class OpenAICompatProvider(LLMProvider):
         self.api_key = api_key
         self.timeout_s = timeout_s
 
-    def generate_json(self, system: str, user: str, schema: dict) -> LLMResult:
+    def generate_json(
+        self, system: str, user: str, schema: dict, on_progress: Optional[ProgressCallback] = None
+    ) -> LLMResult:
+        # on_progress n'est pas utilisé : la réponse arrive ici d'un seul bloc.
         payload = {
             "model": self.model,
             "messages": [

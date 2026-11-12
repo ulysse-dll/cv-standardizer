@@ -10,6 +10,8 @@ Routes :
     POST /api/batch                         plusieurs CV, répond tout de suite (job)
     GET  /api/batch/{job}                   avancement du job
     GET  /api/batch/{job}/items/{n}/{kind}  un résultat (kind = html, json ou pdf)
+    GET  /api/batch/{job}/items/{n}/text    le texte extrait du fichier d'origine
+    PUT  /api/batch/{job}/items/{n}         enregistre un CV corrigé à la main
     GET  /api/batch/{job}/zip               tous les résultats dans un ZIP
 """
 
@@ -17,15 +19,18 @@ import io
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, PlainTextResponse, Response
+from pydantic import ValidationError
 
 from app import ocr, render
 from app.batch import Item, Job, JobQueue
 from app.config import OUTPUTS_DIR, Settings, get_settings
 from app.llm import LLMProvider, get_provider
+from app.pipeline import summarize_error
+from app.schema import CV
 from app.timing import logger, setup_logging
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -71,6 +76,12 @@ def create_app(
             raise HTTPException(404, "Job inconnu (le serveur a peut-être redémarré).")
         return job
 
+    def find_done_item(job_id: str, index: int) -> Tuple[Job, Item]:
+        job = find_job(job_id)
+        if not 0 <= index < len(job.items) or job.items[index].status != "done":
+            raise HTTPException(404, "Ce résultat n'est pas disponible.")
+        return job, job.items[index]
+
     def item_view(job: Job, item: Item) -> dict:
         """Ce que l'API renvoie pour un CV (jamais le contenu du fichier d'origine)."""
         base_url = f"/api/batch/{job.id}/items/{item.index}"
@@ -79,6 +90,9 @@ def create_app(
             "index": item.index,
             "filename": item.filename,
             "status": item.status,
+            "step": item.step,
+            "progress": round(item.progress, 3),
+            "edited": item.edited,
             "error": item.error,
             "name": item.cv.identity.full_name if item.cv else None,
             "attempts": item.attempts,
@@ -141,6 +155,22 @@ def create_app(
     @app.get("/api/batch/{job_id}")
     def batch_status(job_id: str) -> dict:
         return job_view(find_job(job_id))
+
+    @app.get("/api/batch/{job_id}/items/{index}/text", response_class=PlainTextResponse)
+    def source_text(job_id: str, index: int) -> str:
+        """Le texte extrait du fichier d'origine, tel que le LLM l'a reçu."""
+        return find_done_item(job_id, index)[1].source_text
+
+    @app.put("/api/batch/{job_id}/items/{index}")
+    def save_correction(job_id: str, index: int, corrected: dict = Body(...)) -> dict:
+        """Reçoit un CV corrigé à la main, le valide, et régénère HTML et PDF."""
+        job, item = find_done_item(job_id, index)
+        try:
+            cv = CV.model_validate(corrected)  # même validation que pour la réponse du LLM
+        except ValidationError as error:
+            raise HTTPException(422, f"CV invalide : {summarize_error(error)}")
+        app.state.jobs.update_cv(job, item, cv)
+        return item_view(job, item)
 
     @app.get("/api/batch/{job_id}/items/{index}/{kind}")
     def download_result(job_id: str, index: int, kind: str) -> Response:

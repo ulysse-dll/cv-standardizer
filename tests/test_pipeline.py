@@ -40,9 +40,13 @@ class FakeProvider(LLMProvider):
         self.answers = list(answers)
         self.prompts = []  # on note ce qu'on nous envoie, pour le vérifier ensuite
 
-    def generate_json(self, system, user, schema):
+    def generate_json(self, system, user, schema, on_progress=None):
         self.prompts.append(user)
-        return LLMResult(text=self.answers.pop(0))
+        answer = self.answers.pop(0)
+        if on_progress:  # comme un vrai modèle : on signale l'avancement en deux fois
+            on_progress(len(answer) // 2)
+            on_progress(len(answer))
+        return LLMResult(text=answer)
 
 
 def test_valid_answer_needs_one_call():
@@ -83,6 +87,20 @@ def test_process_cv_end_to_end(samples_dir):
     assert "Inès Benali" in provider.prompts[0]  # le texte extrait est bien parti au LLM
     assert "Inès Benali" in result.html  # le CV standardisé a été généré
     assert set(result.timings) == {"extraction", "llm", "validation", "html", "pdf"}
+
+
+def test_progress_is_reported_step_by_step(samples_dir):
+    seen = []  # la liste des (étape, fraction) reçus
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    process_cv(
+        data, "cv_tableaux_fr.docx", FakeProvider([VALID_JSON]), Settings(_env_file=None),
+        on_progress=lambda step, fraction: seen.append((step, fraction)),
+    )
+    steps = [step for step, _ in seen]
+    assert steps[0] == "extraction" and steps[-1] == "rendu"
+    llm_fractions = [fraction for step, fraction in seen if step == "llm"]
+    assert llm_fractions == sorted(llm_fractions)  # la barre ne recule jamais
+    assert 0 < llm_fractions[-1] <= 0.97  # et ne dit jamais 100 % avant la fin
 
 
 def test_very_long_cv_is_cut_with_a_warning(samples_dir):

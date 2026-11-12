@@ -1,5 +1,8 @@
 """Tests de la couche LLM, sans réseau : on intercepte l'appel HTTP."""
 
+import json
+from contextlib import contextmanager
+
 import httpx
 import pytest
 
@@ -46,38 +49,56 @@ def test_custom_can_speak_ollama_or_openai():
 
 
 # ------------------------------------------------------ appel Ollama -----
+def _fake_ollama(monkeypatch, status=200, lines=(), sent=None):
+    """Remplace httpx.stream par un faux Ollama qui répond les lignes données."""
+
+    @contextmanager
+    def fake_stream(method, url, json, headers, timeout):
+        if sent is not None:
+            sent.update(url=url, json=json)
+        yield httpx.Response(status, content="\n".join(lines).encode("utf-8"))
+
+    monkeypatch.setattr(httpx, "stream", fake_stream)
+
+
 def test_ollama_call_sends_schema_and_reads_speed(monkeypatch):
     sent = {}
-
-    def fake_post(url, json, headers, timeout):
-        sent.update(url=url, json=json)
-        return httpx.Response(
-            200,
-            json={
-                "message": {"content": '{"ok": true}'},
-                "prompt_eval_count": 500,
-                "eval_count": 100,
-                "eval_duration": 10_000_000_000,  # 10 secondes, en nanosecondes
-                "done_reason": "stop",
-            },
-        )
-
-    monkeypatch.setattr(httpx, "post", fake_post)
+    # Ollama envoie la réponse en plusieurs morceaux, puis une dernière ligne de statistiques.
+    lines = [
+        json.dumps({"message": {"content": '{"ok": '}, "done": False}),
+        json.dumps({"message": {"content": "true}"}, "done": False}),
+        json.dumps({
+            "message": {"content": ""}, "done": True, "done_reason": "stop",
+            "prompt_eval_count": 500, "eval_count": 100,
+            "eval_duration": 10_000_000_000,  # 10 secondes, en nanosecondes
+        }),
+    ]
+    _fake_ollama(monkeypatch, lines=lines, sent=sent)
     schema = cv_json_schema()
-    result = OllamaProvider("http://localhost:11434/", "gemma3:4b").generate_json("sys", "user", schema)
+    progress = []
+    result = OllamaProvider("http://localhost:11434/", "gemma3:4b").generate_json(
+        "sys", "user", schema, on_progress=progress.append
+    )
 
     assert sent["url"] == "http://localhost:11434/api/chat"
     assert sent["json"]["format"] == schema  # la sortie JSON est bien forcée
-    assert sent["json"]["stream"] is False
+    assert sent["json"]["stream"] is True
     assert sent["json"]["options"]["temperature"] == 0
-    assert result.text == '{"ok": true}'
+    assert result.text == '{"ok": true}'  # les morceaux sont recollés dans l'ordre
+    assert progress == [7, 12, 12]  # nombre de caractères écrits, après chaque morceau
     assert result.tokens_per_second == 10.0  # 100 tokens en 10 s
     assert result.truncated is False
 
 
 def test_ollama_missing_model_explains_how_to_fix(monkeypatch):
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: httpx.Response(404, json={"error": "model not found"}))
+    _fake_ollama(monkeypatch, status=404, lines=['{"error": "model not found"}'])
     with pytest.raises(LLMError, match="ollama pull gemma3:4b"):
+        OllamaProvider("http://localhost:11434", "gemma3:4b").generate_json("s", "u", {})
+
+
+def test_ollama_error_in_the_middle_of_the_answer_is_reported(monkeypatch):
+    _fake_ollama(monkeypatch, lines=['{"message": {"content": "{"}}', '{"error": "plus de mémoire"}'])
+    with pytest.raises(LLMError, match="plus de mémoire"):
         OllamaProvider("http://localhost:11434", "gemma3:4b").generate_json("s", "u", {})
 
 
@@ -85,7 +106,7 @@ def test_ollama_not_running_explains_how_to_fix(monkeypatch):
     def refuse(*args, **kwargs):
         raise httpx.ConnectError("connexion refusée")
 
-    monkeypatch.setattr(httpx, "post", refuse)
+    monkeypatch.setattr(httpx, "stream", refuse)
     with pytest.raises(LLMError, match="ollama serve"):
         OllamaProvider("http://localhost:11434", "gemma3:4b").generate_json("s", "u", {})
 

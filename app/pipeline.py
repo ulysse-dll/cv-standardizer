@@ -8,20 +8,27 @@ Chaque étape est chronométrée (timing.py).
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
 from app.config import Settings
 from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
-from app.llm.base import LLMProvider
+from app.llm.base import LLMProvider, ProgressCallback
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
 from app.timing import StepTimer, logger
 
 MAX_ATTEMPTS = 2  # 1 essai + 1 retry automatique
+
+# Pour suivre l'avancement : on nous prête une fonction, qu'on appelle avec le
+# nom de l'étape en cours ("extraction", "llm", "rendu") et une fraction de 0 à 1.
+StepCallback = Callable[[str, float], None]
+# Le JSON produit fait à peu près la longueur du texte du CV, plus les noms
+# des champs (mesuré sur les faux CV). Sert à estimer l'avancement du LLM.
+JSON_OVERHEAD_CHARS = 450
 
 
 class StructuringError(Exception):
@@ -36,6 +43,7 @@ class PipelineResult:
     extraction_method: str  # "pdf-text", "pdf-ocr" ou "docx"
     attempts: int  # 1 = bon du premier coup, 2 = il a fallu le retry
     timings: Dict[str, float]  # durée de chaque étape, en secondes
+    source_text: str = ""  # le texte extrait du fichier, tel que le LLM l'a reçu
     warnings: List[str] = field(default_factory=list)
 
 
@@ -48,7 +56,9 @@ def summarize_error(error: ValidationError) -> str:
     return "; ".join(problems)
 
 
-def structure_cv(text: str, provider: LLMProvider, timer: StepTimer) -> Tuple[CV, int]:
+def structure_cv(
+    text: str, provider: LLMProvider, timer: StepTimer, on_progress: Optional[ProgressCallback] = None
+) -> Tuple[CV, int]:
     """Demande au LLM de structurer le texte. Renvoie le CV validé et le nombre d'essais."""
     schema = cv_json_schema()
     user_prompt = build_user_prompt(text)
@@ -56,7 +66,7 @@ def structure_cv(text: str, provider: LLMProvider, timer: StepTimer) -> Tuple[CV
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         with timer.step("llm"):
-            result = provider.generate_json(SYSTEM_PROMPT, user_prompt, schema)
+            result = provider.generate_json(SYSTEM_PROMPT, user_prompt, schema, on_progress)
         logger.info(
             "[%s] essai %d : %s tokens lus, %s tokens écrits, %s tokens/s",
             timer.label, attempt, result.prompt_tokens, result.output_tokens, result.tokens_per_second,
@@ -78,11 +88,22 @@ def structure_cv(text: str, provider: LLMProvider, timer: StepTimer) -> Tuple[CV
     )
 
 
-def process_cv(data: bytes, filename: str, provider: LLMProvider, settings: Settings) -> PipelineResult:
+def process_cv(
+    data: bytes,
+    filename: str,
+    provider: LLMProvider,
+    settings: Settings,
+    on_progress: Optional[StepCallback] = None,
+) -> PipelineResult:
     """Traite un fichier CV de bout en bout et renvoie le CV structuré."""
     timer = StepTimer(filename)
     warnings: List[str] = []
 
+    def report(step: str, fraction: float = 0.0) -> None:
+        if on_progress:
+            on_progress(step, fraction)
+
+    report("extraction")
     with timer.step("extraction"):
         extraction: ExtractionResult = extract_text(data, filename, settings.ocr_languages)
 
@@ -94,7 +115,15 @@ def process_cv(data: bytes, filename: str, provider: LLMProvider, settings: Sett
         )
     logger.info("[%s] %s, %d page(s), %d caractères", filename, extraction.method, extraction.pages, len(text))
 
-    cv, attempts = structure_cv(text, provider, timer)
+    # Avancement du LLM = caractères déjà écrits / caractères attendus. On
+    # plafonne à 97 % : l'estimation n'est pas exacte, la barre ne doit pas
+    # afficher 100 % avant la vraie fin.
+    expected_chars = len(text) + JSON_OVERHEAD_CHARS
+    report("llm")
+    cv, attempts = structure_cv(
+        text, provider, timer, lambda written: report("llm", min(written / expected_chars, 0.97))
+    )
+    report("rendu")
 
     missing = find_missing_lines(text, cv)
     if missing:
@@ -125,5 +154,6 @@ def process_cv(data: bytes, filename: str, provider: LLMProvider, settings: Sett
         extraction_method=extraction.method,
         attempts=attempts,
         timings=dict(timer.steps),
+        source_text=text,
         warnings=warnings,
     )

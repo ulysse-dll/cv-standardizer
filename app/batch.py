@@ -24,6 +24,7 @@ from app.config import Settings
 from app.extraction import ExtractionError
 from app.llm.base import LLMError, LLMProvider
 from app.pipeline import StructuringError, process_cv
+from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV
 from app.timing import logger
 
@@ -44,6 +45,10 @@ class Item:
     warnings: List[str] = field(default_factory=list)
     output_stem: Optional[str] = None  # nom des fichiers produits, sans extension
     has_pdf: bool = False
+    step: Optional[str] = None  # étape en cours : "extraction", "llm" ou "rendu"
+    progress: float = 0.0  # avancement de l'étape en cours, de 0 à 1
+    source_text: str = ""  # le texte extrait du fichier (pour comparer avec le résultat)
+    edited: bool = False  # vrai si l'utilisateur a corrigé le résultat à la main
 
 
 @dataclass
@@ -100,13 +105,18 @@ class JobQueue:
 
     def _process(self, job: Job, item: Item) -> None:
         item.status = "running"
+
+        def on_progress(step: str, fraction: float) -> None:
+            item.step, item.progress = step, fraction
+
         try:
-            result = process_cv(item.data or b"", item.filename, self.provider, self.settings)
+            result = process_cv(item.data or b"", item.filename, self.provider, self.settings, on_progress)
             item.cv = result.cv
             item.attempts = result.attempts
             item.extraction_method = result.extraction_method
             item.timings = result.timings
             item.warnings = result.warnings
+            item.source_text = result.source_text
             self._save(job, item, result.html, result.pdf)
             item.status = "done"
         except (ExtractionError, LLMError, StructuringError) as error:
@@ -118,6 +128,30 @@ class JobQueue:
             logger.exception("[%s] erreur inattendue", item.filename)
         finally:
             item.data = None  # on ne garde pas le fichier d'origine en mémoire
+            item.step = None
+
+    # ------------------------------------------- correction à la main ---
+    def update_cv(self, job: Job, item: Item, cv: CV) -> None:
+        """Remplace le CV d'un item par une version corrigée, et refait HTML et PDF.
+
+        Aucun LLM ici : c'est instantané (à part le PDF, une à deux secondes).
+        """
+        html = render_html(cv)
+        # Les alertes « À vérifier » concernaient la version du modèle : elles tombent.
+        warnings = [w for w in item.warnings if not w.startswith(("À vérifier", "Génération PDF"))]
+        pdf = None
+        try:
+            pdf = render_pdf(html)
+        except PDFUnavailableError as error:
+            warnings.append(str(error))
+
+        # Si le nom du candidat a été corrigé, le nom des fichiers change :
+        # on supprime les anciens pour ne pas laisser deux versions.
+        folder = self.job_dir(job)
+        for extension in ("json", "html", "pdf"):
+            (folder / f"{item.output_stem}.{extension}").unlink(missing_ok=True)
+        item.cv, item.warnings, item.has_pdf, item.edited = cv, warnings, False, True
+        self._save(job, item, html, pdf)
 
     def _save(self, job: Job, item: Item, html: str, pdf: Optional[bytes]) -> None:
         """Écrit les fichiers produits dans outputs/<job>/."""
