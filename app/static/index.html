@@ -95,8 +95,8 @@ fetch("/api/config").then((r) => r.json()).then((config) => {
     banner.textContent = `Traitement 100 % local · ${config.provider} · ${config.model}`;
   }
   const missing = [];
-  if (!config.ocr_available) missing.push("OCR indisponible (Tesseract absent) : les PDF scannés seront refusés");
-  if (!config.pdf_available) missing.push("export PDF indisponible (Pango absent)");
+  if (!config.ocr_engine) missing.push("OCR indisponible : les PDF scannés seront refusés");
+  if (!config.pdf_engine) missing.push("export PDF indisponible");
   if (missing.length) banner.textContent += " — " + missing.join(" ; ");
 });
 

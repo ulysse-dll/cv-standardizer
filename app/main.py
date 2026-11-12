@@ -22,11 +22,10 @@ from typing import List, Optional
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 
+from app import ocr, render
 from app.batch import Item, Job, JobQueue
 from app.config import OUTPUTS_DIR, Settings, get_settings
-from app.extraction import find_tesseract
 from app.llm import LLMProvider, get_provider
-from app.render import pdf_available
 from app.timing import logger, setup_logging
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -113,8 +112,8 @@ def create_app(
             "provider": llm.name,
             "model": llm.model,
             "remote": settings.is_remote,
-            "ocr_available": find_tesseract() is not None,
-            "pdf_available": pdf_available(),
+            "ocr_engine": ocr.ocr_engine(),  # "tesseract", "apple-vision" ou null
+            "pdf_engine": render.pdf_engine(),  # "weasyprint", "navigateur" ou null
         }
 
     @app.post("/api/process")

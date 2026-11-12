@@ -15,10 +15,14 @@ pymupdf               # PDF
 python-docx           # DOCX
 pytesseract           # pont Python vers le programme Tesseract (OCR)
 pillow                # images, pour l'OCR
+# OCR intégré à macOS, utilisé quand Tesseract n'est pas installé.
+# (La fin de ligne signifie : "à installer seulement sur Mac".)
+pyobjc-framework-Vision; sys_platform == "darwin"
 
 # Génération du CV standardisé
 jinja2
-weasyprint            # HTML -> PDF (a besoin de la bibliothèque système Pango)
+weasyprint            # HTML -> PDF (a besoin de la bibliothèque système Pango ;
+                      # sans elle, l'application passe par Chrome)
 
 # Tests
 pytest

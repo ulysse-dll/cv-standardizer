@@ -1,8 +1,10 @@
 """Tests de la génération du CV standardisé (HTML, et PDF si WeasyPrint fonctionne)."""
 
+import fitz  # PyMuPDF, pour relire le PDF produit
 import pytest
 
-from app.render import detect_language, pdf_available, period, render_html, render_pdf
+from app import render
+from app.render import PDFUnavailableError, detect_language, pdf_available, period, render_html, render_pdf
 from app.schema import CV
 from tests.test_schema import VALID_CV
 
@@ -48,7 +50,26 @@ def test_period_formats():
     assert period("01/2022", "present", "aujourd'hui") == "01/2022 – aujourd'hui"
 
 
-@pytest.mark.skipif(not pdf_available(), reason="WeasyPrint ne trouve pas Pango")
+@pytest.mark.real_pdf
+@pytest.mark.skipif(not pdf_available(), reason="Aucun moteur PDF (ni WeasyPrint, ni navigateur)")
 def test_pdf_is_generated():
     pdf = render_pdf(render_html(CV.model_validate(VALID_CV)))
     assert pdf.startswith(b"%PDF")
+    # Le PDF contient du vrai texte (pas une image) : on le relit avec PyMuPDF.
+    document = fitz.open(stream=pdf, filetype="pdf")
+    assert len(document) == 1
+    assert "Camille Lefèvre" in document[0].get_text()
+
+
+@pytest.mark.real_pdf
+@pytest.mark.skipif(render.find_browser() is None, reason="Aucun navigateur de la famille Chrome")
+def test_pdf_falls_back_to_the_browser_without_weasyprint(monkeypatch):
+    monkeypatch.setattr(render, "weasyprint_available", lambda: False)
+    assert render.pdf_engine() == "navigateur"
+    assert render_pdf("<html><body><p>Bonjour</p></body></html>").startswith(b"%PDF")
+
+
+def test_no_pdf_engine_gives_a_clear_error(monkeypatch):
+    monkeypatch.setattr(render, "pdf_engine", lambda: None)
+    with pytest.raises(PDFUnavailableError, match="Génération PDF indisponible"):
+        render_pdf("<html></html>")

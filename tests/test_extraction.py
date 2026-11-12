@@ -2,17 +2,16 @@
 
 import pytest
 
-from app import extraction
+from app import ocr
 from app.extraction import (
     ExtractionError,
     OCRUnavailableError,
     UnsupportedFormatError,
     clean_text,
     extract_text,
-    find_tesseract,
 )
 
-needs_tesseract = pytest.mark.skipif(find_tesseract() is None, reason="Tesseract n'est pas installé")
+needs_ocr = pytest.mark.skipif(ocr.ocr_engine() is None, reason="Aucun OCR (ni Tesseract, ni macOS)")
 
 
 def _extract(samples_dir, filename):
@@ -55,19 +54,28 @@ def test_docx_reads_tables(samples_dir):
     assert "2017 – 2020 | Chargée d'acquisition / VéloVille (mobilité), Rennes | " in result.text
 
 
-@needs_tesseract
+@needs_ocr
 def test_scanned_pdf_uses_ocr(samples_dir):
     result = _extract(samples_dir, "cv_scanne_fr.pdf")
     assert result.method == "pdf-ocr"
     text = result.text.lower()
-    for expected in ("thomas girard", "comptable", "bordeaux", "sage 100"):
+    for expected in ("thomas girard", "comptable", "bordeaux", "sage 100", "thomas.girard@example.com"):
         assert expected in text
 
 
-def test_scanned_pdf_without_tesseract_gives_clear_error(samples_dir, monkeypatch):
-    monkeypatch.setattr(extraction, "find_tesseract", lambda: None)
+def test_scanned_pdf_without_any_ocr_gives_clear_error(samples_dir, monkeypatch):
+    monkeypatch.setattr(ocr, "ocr_engine", lambda: None)
     with pytest.raises(OCRUnavailableError):
         _extract(samples_dir, "cv_scanne_fr.pdf")
+
+
+def test_tesseract_is_preferred_when_installed(monkeypatch):
+    monkeypatch.setattr(ocr, "find_tesseract", lambda: "/usr/local/bin/tesseract")
+    assert ocr.ocr_engine() == "tesseract"
+    # Sans Tesseract, on se rabat sur l'OCR de macOS s'il est là.
+    monkeypatch.setattr(ocr, "find_tesseract", lambda: None)
+    monkeypatch.setattr(ocr, "vision_available", lambda: True)
+    assert ocr.ocr_engine() == "apple-vision"
 
 
 def test_unsupported_format_is_rejected():

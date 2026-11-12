@@ -1,11 +1,17 @@
 """Étape finale : fabriquer le CV standardisé à partir du CV validé.
 
-    CV (Pydantic) --Jinja2--> HTML --WeasyPrint--> PDF
+    CV (Pydantic) --Jinja2--> HTML --WeasyPrint ou navigateur--> PDF
 
 Le HTML sert aussi d'aperçu dans le navigateur.
+
+Deux moteurs PDF : WeasyPrint (qui a besoin de la bibliothèque Pango) et, à
+défaut, un navigateur de la famille Chrome déjà installé sur la machine.
 """
 
 import re
+import shutil
+import subprocess
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -37,7 +43,7 @@ _ENGLISH_WORDS = {"the", "and", "of", "for", "with", "in", "to", "on", "a", "an"
 
 
 class PDFUnavailableError(Exception):
-    """WeasyPrint ne peut pas tourner (bibliothèque Pango absente)."""
+    """Aucun moteur PDF n'a pu produire le fichier."""
 
 
 def detect_language(cv: CV) -> str:
@@ -71,23 +77,98 @@ def render_html(cv: CV) -> str:
 
 
 def render_pdf(html: str) -> bytes:
-    # Import ici, et pas en haut du fichier : si Pango manque, seul le PDF
-    # tombe en panne. Le reste de l'application (JSON, aperçu) continue.
-    if not pdf_available():
-        raise PDFUnavailableError(
-            "Génération PDF indisponible : WeasyPrint ne trouve pas la bibliothèque Pango. "
-            "Voir le README, section Installation."
-        )
-    from weasyprint import HTML
+    """HTML -> PDF, avec le premier moteur disponible (voir pdf_engine)."""
+    engine = pdf_engine()
+    if engine == "weasyprint":
+        # Import ici, et pas en haut du fichier : si Pango manque, seul le PDF
+        # tombe en panne. Le reste de l'application (JSON, aperçu) continue.
+        from weasyprint import HTML
 
-    return HTML(string=html).write_pdf()
+        return HTML(string=html).write_pdf()
+    if engine == "navigateur":
+        return _pdf_with_browser(html, find_browser())
+    raise PDFUnavailableError(
+        "Génération PDF indisponible : ni WeasyPrint (bibliothèque Pango) ni navigateur "
+        "Chrome, Chromium, Edge ou Brave trouvés. Voir le README, section Installation."
+    )
+
+
+def pdf_engine() -> Optional[str]:
+    """Le moteur qui fabriquera les PDF : "weasyprint", "navigateur", ou None."""
+    if weasyprint_available():
+        return "weasyprint"
+    if find_browser():
+        return "navigateur"
+    return None
+
+
+def pdf_available() -> bool:
+    return pdf_engine() is not None
 
 
 @lru_cache
-def pdf_available() -> bool:
+def weasyprint_available() -> bool:
     """WeasyPrint peut-il se charger ? (lru_cache : on ne fait le test qu'une fois.)"""
     try:
         import weasyprint  # noqa: F401
     except (ImportError, OSError):
         return False
     return True
+
+
+# ------------------------------------------- plan B : un navigateur -------
+# Chrome et ses cousins savent "imprimer" une page HTML en PDF sans ouvrir de
+# fenêtre (mode "headless"). C'est le même moteur que Fichier > Imprimer.
+_BROWSER_APPS = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+]
+_BROWSER_COMMANDS = ["google-chrome", "chromium", "chromium-browser", "microsoft-edge"]
+BROWSER_TIMEOUT_S = 60
+
+
+@lru_cache
+def find_browser() -> Optional[str]:
+    for path in _BROWSER_APPS:
+        if Path(path).exists():
+            return path
+    for command in _BROWSER_COMMANDS:
+        found = shutil.which(command)
+        if found:
+            return found
+    return None
+
+
+def _pdf_with_browser(html: str, browser: str) -> bytes:
+    # Le navigateur lit un fichier et en écrit un autre : on passe par un
+    # dossier temporaire, supprimé (avec son contenu) dès la sortie du "with".
+    with tempfile.TemporaryDirectory(prefix="cv-pdf-") as folder:
+        source = Path(folder) / "cv.html"
+        target = Path(folder) / "cv.pdf"
+        source.write_text(html, encoding="utf-8")
+        command = [
+            browser,
+            "--headless=new",  # pas de fenêtre
+            "--disable-gpu",
+            "--no-first-run",
+            "--disable-extensions",
+            # Vie privée : le navigateur n'a aucune raison d'aller sur Internet.
+            # Cette règle fait échouer toute résolution de nom de domaine.
+            "--host-resolver-rules=MAP * ~NOTFOUND",
+            "--disable-background-networking",
+            "--disable-component-update",
+            # Un profil vide et jetable : on ne touche pas au Chrome de l'utilisateur.
+            f"--user-data-dir={Path(folder) / 'profil'}",
+            "--no-pdf-header-footer",  # pas de date ni d'URL en marge
+            f"--print-to-pdf={target}",
+            source.as_uri(),
+        ]
+        try:
+            subprocess.run(command, capture_output=True, timeout=BROWSER_TIMEOUT_S, check=False)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise PDFUnavailableError(f"Génération PDF impossible : le navigateur a échoué ({error}).") from error
+        if not target.exists():
+            raise PDFUnavailableError("Génération PDF impossible : le navigateur n'a produit aucun fichier.")
+        return target.read_bytes()

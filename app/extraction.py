@@ -1,6 +1,6 @@
 """Étape 1 du pipeline : sortir le texte brut d'un CV, SANS LLM.
 
-    PDF  -> PyMuPDF. Si une page n'a pas de texte (PDF scanné), OCR Tesseract.
+    PDF  -> PyMuPDF. Si une page n'a pas de texte (PDF scanné), OCR (ocr.py).
     DOCX -> python-docx, en lisant paragraphes ET tableaux dans l'ordre.
 
 Le point d'entrée est `extract_text(data, filename)`. On travaille sur les
@@ -9,21 +9,21 @@ octets du fichier (bytes) : rien n'a besoin d'être écrit sur le disque.
 
 import io
 import re
-import shutil
-import sys
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import fitz  # PyMuPDF
 from docx import Document
 from docx.table import Table
 
+from app import ocr
+
 # En dessous de ce nombre de caractères, on considère qu'une page n'a pas de
 # "vrai" texte et qu'il s'agit probablement d'une image scannée.
 MIN_CHARS_PER_PAGE = 40
-OCR_DPI = 300  # résolution de l'image envoyée à Tesseract
+OCR_DPI = 300  # résolution de l'image envoyée à l'OCR
 
 
 class ExtractionError(Exception):
@@ -58,37 +58,18 @@ def clean_text(text: str) -> str:
 
 
 # ---------------------------------------------------------------- OCR -----
-def find_tesseract() -> Optional[str]:
-    """Cherche le programme tesseract : à côté de Python d'abord, puis dans le PATH."""
-    beside_python = Path(sys.executable).parent / "tesseract"
-    if beside_python.exists():
-        return str(beside_python)
-    return shutil.which("tesseract")
-
-
-def _usable_languages(pytesseract, wanted: str) -> str:
-    """Garde, parmi les langues demandées, celles réellement installées."""
-    installed = set(pytesseract.get_languages(config=""))
-    usable = [lang for lang in wanted.split("+") if lang in installed]
-    return "+".join(usable) or "eng"
-
-
 def ocr_page(page: "fitz.Page", languages: str) -> str:
-    """Transforme une page en image, puis lit l'image avec Tesseract."""
-    import pytesseract
-    from PIL import Image
-
-    command = find_tesseract()
-    if command is None:
+    """Transforme une page en image, puis fait lire l'image par l'OCR (voir ocr.py)."""
+    if ocr.ocr_engine() is None:
         raise OCRUnavailableError(
-            "Ce PDF est scanné (image sans texte) et Tesseract n'est pas installé : "
-            "OCR impossible. Voir le README, section Installation."
+            "Ce PDF est scanné (image sans texte) et aucun OCR n'est disponible "
+            "(ni Tesseract, ni l'OCR de macOS). Voir le README, section Installation."
         )
-    pytesseract.pytesseract.tesseract_cmd = command
-
     pixmap = page.get_pixmap(dpi=OCR_DPI, colorspace=fitz.csGRAY)
-    image = Image.frombytes("L", (pixmap.width, pixmap.height), pixmap.samples)
-    return pytesseract.image_to_string(image, lang=_usable_languages(pytesseract, languages))
+    try:
+        return ocr.read_image(pixmap.tobytes("png"), languages)
+    except ocr.OCRError as error:
+        raise ExtractionError(str(error)) from error
 
 
 # ---------------------------------------------------------------- PDF -----
