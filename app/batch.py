@@ -54,6 +54,7 @@ class Item:
     step: Optional[str] = None  # étape en cours : "extraction", "llm" ou "rendu"
     progress: float = 0.0  # avancement de l'étape en cours, de 0 à 1
     source_text: str = ""  # le texte extrait du fichier (pour comparer avec le résultat)
+    photo: Optional[bytes] = None  # la photo du candidat (gardée en mémoire, pour refaire la diapo)
     edited: bool = False  # vrai si l'utilisateur a corrigé le résultat à la main
     started: Optional[float] = None  # heure de début du traitement (horloge time.monotonic)
 
@@ -148,6 +149,7 @@ class JobQueue:
             item.timings = result.timings
             item.warnings = result.warnings
             item.source_text = result.source_text
+            item.photo = result.photo
             self._save(job, item, result.html, result.pdf, result.pptx)
             item.status = "done"
         except (ExtractionError, LLMError, StructuringError) as error:
@@ -176,7 +178,7 @@ class JobQueue:
             pdf = render_pdf(html)
         except PDFUnavailableError as error:
             warnings.append(str(error))
-        pptx, slide_notes = render_pptx(cv)
+        pptx, slide_notes = render_pptx(cv, item.photo)
         warnings.extend(f"Diapositive : {note}." for note in slide_notes)
 
         # Si le nom du candidat a été corrigé, le nom des fichiers change :
@@ -186,6 +188,14 @@ class JobQueue:
             (folder / f"{item.output_stem}.{extension}").unlink(missing_ok=True)
         item.cv, item.warnings, item.has_pdf, item.edited = cv, warnings, False, True
         self._save(job, item, html, pdf, pptx)
+
+    def remove_photo(self, job: Job, item: Item) -> None:
+        """Retire la photo (mal choisie, ou non souhaitée) et refait la diapositive sans elle."""
+        item.photo = None
+        pptx, slide_notes = render_pptx(item.cv, None)
+        item.warnings = [w for w in item.warnings if not w.startswith("Diapositive")]
+        item.warnings.extend(f"Diapositive : {note}." for note in slide_notes)
+        (self.job_dir(job) / f"{item.output_stem}.pptx").write_bytes(pptx)
 
     def _save(self, job: Job, item: Item, html: str, pdf: Optional[bytes], pptx: bytes) -> None:
         """Écrit les fichiers produits dans outputs/<job>/."""

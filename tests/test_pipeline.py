@@ -86,7 +86,8 @@ def test_process_cv_end_to_end(samples_dir):
     assert result.attempts == 1
     assert "Inès Benali" in provider.prompts[0]  # le texte extrait est bien parti au LLM
     assert "Inès Benali" in result.html  # le CV standardisé a été généré
-    assert set(result.timings) == {"extraction", "llm", "validation", "html", "pdf", "pptx"}
+    assert set(result.timings) == {"extraction", "photo", "llm", "validation", "html", "pdf", "pptx"}
+    assert result.photo is None  # ce faux CV n'a pas de photo
     assert result.pptx.startswith(b"PK")  # un .pptx est une archive ZIP
 
 

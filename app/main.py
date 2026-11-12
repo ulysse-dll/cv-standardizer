@@ -12,6 +12,8 @@ Routes :
     GET  /api/batch/{job}/items/{n}/{kind}  un résultat (kind = html, json, pdf ou pptx)
     GET  /api/batch/{job}/items/{n}/text    le texte extrait du fichier d'origine
     PUT  /api/batch/{job}/items/{n}         enregistre un CV corrigé à la main
+    GET  /api/batch/{job}/items/{n}/photo   la photo du candidat trouvée dans le fichier
+    DELETE .../items/{n}/photo              retire la photo de la diapositive
     GET  /api/batch/{job}/zip               tous les résultats dans un ZIP
 """
 
@@ -101,6 +103,7 @@ def create_app(
             "progress": round(item.progress, 3),
             "elapsed_seconds": round(time.monotonic() - item.started, 1) if running else None,
             "edited": item.edited,
+            "has_photo": item.photo is not None,
             "error": item.error,
             "name": item.cv.identity.full_name if item.cv else None,
             "attempts": item.attempts,
@@ -113,6 +116,7 @@ def create_app(
                 "json": f"{base_url}/json" if done else None,
                 "pdf": f"{base_url}/pdf" if done and item.has_pdf else None,
                 "pptx": f"{base_url}/pptx" if done else None,
+                "photo": f"{base_url}/photo" if done and item.photo else None,
             },
         }
 
@@ -169,6 +173,21 @@ def create_app(
     def source_text(job_id: str, index: int) -> str:
         """Le texte extrait du fichier d'origine, tel que le LLM l'a reçu."""
         return find_done_item(job_id, index)[1].source_text
+
+    @app.get("/api/batch/{job_id}/items/{index}/photo")
+    def photo(job_id: str, index: int) -> Response:
+        """La photo du candidat, telle qu'elle apparaît sur la diapositive."""
+        item = find_done_item(job_id, index)[1]
+        if item.photo is None:
+            raise HTTPException(404, "Pas de photo pour ce CV.")
+        return Response(item.photo, media_type="image/jpeg")
+
+    @app.delete("/api/batch/{job_id}/items/{index}/photo")
+    def remove_photo(job_id: str, index: int) -> dict:
+        """Retire la photo (le programme a pu se tromper d'image) et refait la diapositive."""
+        job, item = find_done_item(job_id, index)
+        app.state.jobs.remove_photo(job, item)
+        return item_view(job, item)
 
     @app.put("/api/batch/{job_id}/items/{index}")
     def save_correction(job_id: str, index: int, corrected: dict = Body(...)) -> dict:

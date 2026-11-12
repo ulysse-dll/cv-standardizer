@@ -45,6 +45,14 @@ def test_pdf_two_columns_keeps_each_column_together(samples_dir):
     assert lines[position + 1].startswith("Jan 2022")
 
 
+def test_pdf_with_photo_and_logo_still_gives_its_text(samples_dir):
+    # Une photo et un logo sur la page ne doivent pas déclencher l'OCR : le texte est là.
+    result = _extract(samples_dir, "cv_photo_fr.pdf")
+    assert result.method == "pdf-text"
+    for expected in ("Léa Marchand", "lea.marchand@example.org", "Studio Garonne", "Master Design d'interaction"):
+        assert expected in result.text
+
+
 def test_docx_reads_tables(samples_dir):
     result = _extract(samples_dir, "cv_tableaux_fr.docx")
     assert result.method == "docx"

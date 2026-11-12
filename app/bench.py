@@ -14,7 +14,7 @@ from app.llm import get_provider
 from app.pipeline import process_cv
 from app.timing import setup_logging
 
-STEPS = ["extraction", "llm", "validation", "html", "pdf", "pptx"]
+STEPS = ["extraction", "photo", "llm", "validation", "html", "pdf", "pptx"]
 
 
 def main() -> None:

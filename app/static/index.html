@@ -53,6 +53,8 @@
   ul#items li.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
   .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .name { font-weight: 600; overflow-wrap: anywhere; }
+  .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .who img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid var(--line); }
   .filename { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
   .status { font-size: 12px; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: #eef1f4; color: var(--muted); }
   .status.running { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
@@ -148,6 +150,7 @@
         <div id="pane-edit" class="card" hidden>
           <div class="editor-bar">
             <button id="save" class="primary">Enregistrer et régénérer</button>
+            <button id="remove-photo" hidden>Retirer la photo de la diapositive</button>
             <span id="edit-message" class="muted">Corrige ce que le modèle a mal lu. Le PDF et la diapositive sont refaits sans relancer le LLM.</span>
           </div>
           <div id="form"></div>
@@ -176,7 +179,7 @@ let originalUrl = null; // adresse temporaire du PDF d'origine affiché
 let readForm = null;    // fonction qui relit le formulaire de correction
 
 const STATUS_LABELS = { pending: "en attente", running: "en cours", done: "terminé", error: "erreur" };
-const STEP_LABELS = { extraction: "lecture", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF", pptx: "PowerPoint" };
+const STEP_LABELS = { extraction: "lecture", photo: "photo", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF", pptx: "PowerPoint" };
 const METHOD_LABELS = { "pdf-text": "PDF texte", "pdf-ocr": "PDF scanné (OCR)", docx: "DOCX" };
 const seconds = (value) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " s";
 
@@ -319,7 +322,15 @@ function renderList() {
 
     // --- ligne de titre : nom du candidat (ou du fichier) et état ---
     const row = element("div", "row");
-    row.append(element("span", "name", item.name || item.filename));
+    const who = element("span", "who");
+    if (item.links.photo) {  // la photo trouvée dans le CV, en vignette
+      const thumbnail = element("img");
+      thumbnail.src = item.links.photo;
+      thumbnail.alt = "";
+      who.append(thumbnail);
+    }
+    who.append(element("span", "name", item.name || item.filename));
+    row.append(who);
     let statusText = STATUS_LABELS[item.status];
     if (item.status === "running" && item.elapsed_seconds !== null) statusText += ` · ${Math.round(item.elapsed_seconds)} s`;
     if (item.status === "done") statusText += ` · ${seconds(item.total_seconds)}`;
@@ -396,6 +407,7 @@ function renderPane() {
     if (button.dataset.tab === "original") button.hidden = !hasOriginal;
   });
   for (const name of ["result", "original", "text", "edit"]) $(`pane-${name}`).hidden = name !== tab;
+  $("remove-photo").hidden = !item.has_photo;
 
   // Rien n'a changé depuis le dernier affichage ? On ne recharge pas
   // (sinon l'aperçu clignoterait et le formulaire se viderait à chaque seconde).
@@ -533,6 +545,17 @@ function buildForm(cv) {
   }
   readForm = () => Object.fromEntries(Object.entries(readers).map(([key, reader]) => [key, reader()]));
 }
+
+// Le programme a pu prendre un logo pour la photo : un clic la retire de la diapositive.
+$("remove-photo").addEventListener("click", async () => {
+  if (selected === null) return;
+  const response = await fetch(`/api/batch/${job.job_id}/items/${selected}/photo`, { method: "DELETE" });
+  if (!response.ok) { setEditMessage("La photo n'a pas pu être retirée.", "error"); return; }
+  job.items[selected] = await response.json();
+  renderList();  // la vignette disparaît ; le formulaire en cours n'est pas touché
+  $("remove-photo").hidden = true;
+  setEditMessage("Photo retirée : la diapositive affiche maintenant les initiales.", "ok");
+});
 
 function setEditMessage(text, className) {
   $("edit-message").textContent = text;

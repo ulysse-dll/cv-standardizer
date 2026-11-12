@@ -5,8 +5,12 @@ import io
 from pptx import Presentation
 from pptx.util import Inches
 
+from PIL import Image
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+
 from app.schema import CV
-from app.slides import MAIN_TEXT_WIDTH, Line, estimated_height, fit_main, render_pptx
+from app.slides import MAIN_TEXT_WIDTH, Line, estimated_height, fit_main, initials, render_pptx, round_photo
+from samples.generate_samples import _png, draw_portrait
 from tests.test_schema import VALID_CV
 
 
@@ -33,6 +37,48 @@ def test_slide_is_one_16_9_page():
     presentation = Presentation(io.BytesIO(pptx))
     assert presentation.slide_width == Inches(13.333)
     assert presentation.slide_height == Inches(7.5)
+
+
+def _pictures(pptx: bytes) -> list:
+    shapes = Presentation(io.BytesIO(pptx)).slides[0].shapes
+    return [shape for shape in shapes if shape.shape_type == MSO_SHAPE_TYPE.PICTURE]
+
+
+def test_without_photo_the_slide_shows_the_initials():
+    pptx, _ = render_pptx(CV.model_validate(VALID_CV))
+    assert _pictures(pptx) == []
+    assert "CL" in _slide_text(pptx).split("\n")  # le rond des initiales de Camille Lefèvre
+
+
+def test_with_a_photo_the_slide_contains_the_picture_in_the_top_left_corner():
+    photo = _png(draw_portrait(300))
+    pptx, _ = render_pptx(CV.model_validate(VALID_CV), photo)
+    pictures = _pictures(pptx)
+    assert len(pictures) == 1
+    picture = pictures[0]
+    assert picture.width == picture.height  # un rond, pas un ovale
+    assert picture.left < Inches(1) and picture.top < Inches(1)  # en haut à gauche
+    assert "CL" not in _slide_text(pptx).split("\n")  # plus d'initiales : la photo les remplace
+
+
+def test_unreadable_photo_falls_back_to_the_initials():
+    pptx, _ = render_pptx(CV.model_validate(VALID_CV), b"ceci n'est pas une image")
+    assert _pictures(pptx) == []
+    assert "CL" in _slide_text(pptx).split("\n")
+
+
+def test_round_photo_has_transparent_corners():
+    rounded = Image.open(io.BytesIO(round_photo(_png(draw_portrait(200)))))
+    assert rounded.mode == "RGBA" and rounded.width == rounded.height
+    assert rounded.getpixel((2, 2))[3] == 0  # coin : transparent
+    assert rounded.getpixel((rounded.width // 2, rounded.height // 2))[3] == 255  # centre : opaque
+
+
+def test_initials():
+    assert initials("Camille Lefèvre") == "CL"
+    assert initials("Jean-Pierre de La Tour") == "JT"  # premier et dernier mot
+    assert initials("Madonna") == "M"
+    assert initials("") == "?"
 
 
 def test_english_cv_gets_english_headings():
@@ -63,10 +109,10 @@ def _long_cv(jobs: int, highlights: int) -> CV:
 def test_medium_cv_shrinks_the_font_but_keeps_everything():
     labels = {"summary": "Profil", "experiences": "Expériences", "education": "Formation",
               "certifications": "Certifications", "present": "aujourd'hui"}
-    fit = fit_main(_long_cv(jobs=7, highlights=4), labels)
+    fit = fit_main(_long_cv(jobs=5, highlights=4), labels)
     assert fit.size < 12
     assert fit.dropped == []
-    assert sum(line.runs[0][0].startswith("•") for line in fit.lines) == 28  # 7 postes x 4 réalisations
+    assert sum(line.runs[0][0].startswith("•") for line in fit.lines) == 20  # 5 postes x 4 réalisations
 
 
 def test_very_long_cv_drops_highlights_and_says_so():

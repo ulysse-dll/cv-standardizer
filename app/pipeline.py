@@ -1,6 +1,6 @@
 """Le pipeline complet pour UN CV :
 
-    fichier -> texte (extraction.py) -> JSON (LLM) -> validation Pydantic
+    fichier -> texte (extraction.py) + photo (photo.py) -> JSON (LLM) -> validation Pydantic
             -> 1 nouvel essai si le JSON est invalide -> CV validé
             -> HTML puis PDF (render.py), diapositive PowerPoint (slides.py)
 
@@ -16,6 +16,7 @@ from app.config import Settings
 from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
 from app.llm.base import LLMProvider, ProgressCallback
+from app.photo import extract_photo
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
@@ -48,6 +49,7 @@ class PipelineResult:
     attempts: int  # 1 = bon du premier coup, 2 = il a fallu le retry
     timings: Dict[str, float]  # durée de chaque étape, en secondes
     source_text: str = ""  # le texte extrait du fichier, tel que le LLM l'a reçu
+    photo: Optional[bytes] = None  # la photo du candidat trouvée dans le fichier, s'il y en a une
     warnings: List[str] = field(default_factory=list)
 
 
@@ -110,6 +112,8 @@ def process_cv(
     report("extraction")
     with timer.step("extraction"):
         extraction: ExtractionResult = extract_text(data, filename, settings.ocr_languages)
+    with timer.step("photo"):
+        photo = extract_photo(data, filename)  # None s'il n'y a pas de photo
 
     text = extraction.text
     if len(text) > settings.max_cv_chars:
@@ -149,7 +153,7 @@ def process_cv(
     except PDFUnavailableError as error:
         warnings.append(str(error))  # pas de PDF, mais le JSON et l'aperçu restent utilisables
     with timer.step("pptx"):
-        pptx, slide_notes = render_pptx(cv)
+        pptx, slide_notes = render_pptx(cv, photo)
     # Un CV long ne tient pas toujours sur une diapo : on dit ce qui a été raccourci.
     warnings.extend(f"Diapositive : {note}." for note in slide_notes)
 
@@ -160,6 +164,7 @@ def process_cv(
         html=html,
         pdf=pdf,
         pptx=pptx,
+        photo=photo,
         extraction_method=extraction.method,
         attempts=attempts,
         timings=dict(timer.steps),

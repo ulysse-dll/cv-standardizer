@@ -1,4 +1,4 @@
-"""Fabrique 4 faux CV de test, volontairement différents.
+"""Fabrique 5 faux CV de test, volontairement différents.
 
     python samples/generate_samples.py
 
@@ -6,6 +6,7 @@
 2. cv_two_columns_en.pdf    PDF deux colonnes, en anglais
 3. cv_tableaux_fr.docx      DOCX dont le contenu est rangé dans des tableaux
 4. cv_scanne_fr.pdf         PDF "scanné" : une image, aucun texte -> force l'OCR
+5. cv_photo_fr.pdf          PDF avec une photo (un portrait dessiné) et un logo
 
 Toutes les personnes, entreprises et coordonnées sont inventées.
 """
@@ -16,7 +17,7 @@ from pathlib import Path
 import fitz  # c'est le nom d'import de PyMuPDF
 from docx import Document
 from docx.shared import Pt
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 SAMPLES_DIR = Path(__file__).resolve().parent
 A4 = fitz.paper_rect("a4")  # 595 x 842 points
@@ -281,7 +282,96 @@ def make_scanned(path: Path) -> None:
     scanned.save(str(path))
 
 
+# --------------------------------------------------------------------------
+# 5. PDF avec photo
+# --------------------------------------------------------------------------
+def draw_portrait(size: int = 600) -> Image.Image:
+    """Un portrait DESSINÉ (personne qui n'existe pas) : il tient lieu de photo."""
+    image = Image.new("RGB", (size, size), (196, 212, 226))
+    draw = ImageDraw.Draw(image)
+    s = size / 600  # toutes les mesures sont prévues pour 600 pixels
+    hair, skin, shadow = (58, 40, 30), (232, 190, 160), (214, 168, 138)
+    draw.ellipse([70 * s, 430 * s, 530 * s, 800 * s], fill=(44, 62, 92))  # épaules
+    draw.polygon([(250 * s, 380 * s), (350 * s, 380 * s), (372 * s, 470 * s), (228 * s, 470 * s)], fill=shadow)  # cou
+    draw.ellipse([170 * s, 95 * s, 430 * s, 445 * s], fill=skin)  # visage
+    draw.pieslice([160 * s, 70 * s, 440 * s, 330 * s], 180, 360, fill=hair)  # cheveux
+    draw.ellipse([160 * s, 150 * s, 200 * s, 300 * s], fill=hair)
+    draw.ellipse([400 * s, 150 * s, 440 * s, 300 * s], fill=hair)
+    for center in (245, 355):  # yeux et sourcils
+        draw.ellipse([(center - 24) * s, 232 * s, (center + 24) * s, 258 * s], fill=(250, 250, 250))
+        draw.ellipse([(center - 11) * s, 234 * s, (center + 11) * s, 256 * s], fill=(60, 45, 35))
+        draw.arc([(center - 32) * s, 205 * s, (center + 32) * s, 240 * s], 200, 340, fill=hair, width=max(2, int(6 * s)))
+    draw.polygon([(300 * s, 255 * s), (282 * s, 325 * s), (318 * s, 325 * s)], fill=shadow)  # nez
+    draw.arc([255 * s, 325 * s, 345 * s, 395 * s], 20, 160, fill=(150, 70, 70), width=max(2, int(8 * s)))  # bouche
+    return image.filter(ImageFilter.GaussianBlur(1.2 * s))
+
+
+def draw_logo() -> Image.Image:
+    """Un faux logo, large et plat : il ne doit PAS être pris pour la photo."""
+    image = Image.new("RGB", (480, 120), (240, 244, 248))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([10, 10, 110, 110], fill=(31, 78, 121))
+    draw.rectangle([130, 45, 460, 75], fill=(120, 140, 160))
+    return image
+
+
+def _png(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+PHOTO_HEADER_HTML = """
+<h1>Léa Marchand</h1>
+<p><b>Designer UX/UI</b></p>
+<p class="muted">Toulouse (31) · 01 55 44 33 22 · lea.marchand@example.org · leamarchand.example</p>
+"""
+
+PHOTO_BODY_HTML = """
+<h2>Profil</h2>
+<p>Designer UX/UI avec cinq ans d'expérience sur des applications mobiles et des outils métier.
+Aime partir du terrain : entretiens utilisateurs, prototypes, tests, puis mesure des résultats.</p>
+
+<h2>Expériences professionnelles</h2>
+<h3>Designer UX/UI — Studio Garonne, Toulouse</h3>
+<p class="muted">Janvier 2022 – aujourd'hui</p>
+<ul>
+  <li>Refonte de l'application mobile d'une mutuelle : note de l'App Store passée de 3,1 à 4,4.</li>
+  <li>Création d'un design system partagé par quatre équipes produit.</li>
+  <li>Animation de 30 entretiens utilisateurs par an.</li>
+</ul>
+<h3>Designer d'interface — Aérolab, Blagnac</h3>
+<p class="muted">Septembre 2019 – Décembre 2021</p>
+<ul>
+  <li>Conception des écrans d'un outil de planification de maintenance.</li>
+  <li>Tests d'utilisabilité avec les techniciens en atelier.</li>
+</ul>
+
+<h2>Formation</h2>
+<p><b>Master Design d'interaction</b> — Université Toulouse Jean Jaurès, 2017 – 2019</p>
+<p><b>Licence Arts appliqués</b> — Université Bordeaux Montaigne, 2014 – 2017</p>
+
+<h2>Compétences</h2>
+<p>Figma, prototypage, design system, tests utilisateurs, accessibilité (RGAA), HTML, CSS</p>
+
+<h2>Langues</h2>
+<p>Français (langue maternelle), Anglais (courant), Italien (intermédiaire)</p>
+"""
+
+
+def make_photo(path: Path) -> None:
+    doc, page = _new_page()
+    # La photo en haut à gauche, le nom à sa droite, comme sur beaucoup de CV.
+    page.insert_image(fitz.Rect(50, 45, 135, 147), stream=_png(draw_portrait().crop((60, 0, 540, 576))))
+    page.insert_htmlbox(fitz.Rect(155, 55, A4.width - 50, 150), PHOTO_HEADER_HTML, css=BASE_CSS)
+    page.insert_htmlbox(fitz.Rect(50, 165, A4.width - 50, A4.height - 80), PHOTO_BODY_HTML, css=BASE_CSS)
+    # Un logo en bas de page : le programme doit l'ignorer.
+    page.insert_image(fitz.Rect(50, A4.height - 70, 170, A4.height - 40), stream=_png(draw_logo()))
+    doc.save(str(path))
+
+
 SAMPLES = {
+    "cv_photo_fr.pdf": make_photo,
     "cv_classique_fr.pdf": make_classique,
     "cv_two_columns_en.pdf": make_two_columns,
     "cv_tableaux_fr.docx": make_docx_tables,

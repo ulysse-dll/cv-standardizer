@@ -7,6 +7,7 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from app import batch
 from app.config import Settings
@@ -149,6 +150,33 @@ def test_invalid_correction_is_refused_and_changes_nothing(client, samples_dir):
 def test_unknown_job_is_a_404(client):
     assert client.get("/api/batch/inconnu").status_code == 404
     assert client.get("/api/batch/inconnu/items/0/json").status_code == 404
+
+
+def test_photo_is_served_then_can_be_removed(client, samples_dir):
+    data = (samples_dir / "cv_photo_fr.pdf").read_bytes()
+    body = client.post("/api/process", files={"file": ("cv_photo_fr.pdf", data)}).json()
+    url = f"/api/batch/{body['job_id']}/items/0"
+    assert body["has_photo"] is True
+
+    photo = client.get(body["links"]["photo"])
+    assert photo.headers["content-type"] == "image/jpeg"
+    has_picture = lambda: any(
+        shape.shape_type == MSO_SHAPE_TYPE.PICTURE
+        for shape in Presentation(io.BytesIO(client.get(f"{url}/pptx").content)).slides[0].shapes
+    )
+    assert has_picture()  # la diapositive contient la photo
+
+    removed = client.delete(f"{url}/photo")
+    assert removed.status_code == 200
+    assert removed.json()["has_photo"] is False and removed.json()["links"]["photo"] is None
+    assert client.get(f"{url}/photo").status_code == 404
+    assert not has_picture()  # la diapositive a été refaite sans elle
+
+
+def test_cv_without_photo_has_no_photo_link(client, samples_dir):
+    data = (samples_dir / "cv_tableaux_fr.docx").read_bytes()
+    body = client.post("/api/process", files={"file": ("cv_tableaux_fr.docx", data)}).json()
+    assert body["has_photo"] is False and body["links"]["photo"] is None
 
 
 def test_keep_awake_runs_caffeinate_only_during_the_block():
