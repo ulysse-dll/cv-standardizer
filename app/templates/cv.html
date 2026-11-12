@@ -86,7 +86,7 @@
   {% for study in cv.education %}
   <div class="entry">
     <div class="entry-head">
-      <span class="entry-main">{{ study.degree }}{% if study.school %}<span class="entry-sub"> — {{ study.school }}</span>{% endif %}</span>
+      <span class="entry-main">{{ study.degree }}{% if study.school or study.location %}<span class="entry-sub"> — {{ [study.school, study.location] | select | join(", ") }}</span>{% endif %}</span>
       <span class="entry-dates">{{ period(study.start, study.end) }}</span>
     </div>
   </div>

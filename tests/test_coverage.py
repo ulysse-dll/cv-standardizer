@@ -1,6 +1,6 @@
-"""Tests du filet de sécurité qui repère les lignes oubliées par le LLM."""
+"""Tests des filets de sécurité : lignes oubliées et valeurs inventées par le LLM."""
 
-from app.coverage import find_missing_lines
+from app.coverage import find_missing_lines, find_unsupported_values
 from app.schema import CV
 
 SOURCE = """Daniel Okafor
@@ -40,6 +40,23 @@ def test_section_headings_and_rewritten_dates_are_not_reported():
     source = "Expériences professionnelles\nPériode | Poste et entreprise | Réalisations\nMars 2021 – aujourd'hui"
     cv = CV.model_validate({"identity": {"full_name": "Jean Dupont"}})
     assert find_missing_lines(source, cv) == []
+
+
+def test_faithful_cv_has_no_unsupported_value():
+    # Les dates réécrites ("Jan 2022" -> "01/2022") ne comptent pas comme inventées.
+    assert find_unsupported_values(SOURCE, CV.model_validate(COMPLETE)) == []
+
+
+def test_invented_value_is_reported():
+    invented = {**COMPLETE, "certifications": [{"name": "AWS Solutions Architect", "issuer": "Amazon"}]}
+    assert find_unsupported_values(SOURCE, CV.model_validate(invented)) == ["AWS Solutions Architect", "Amazon"]
+
+
+def test_case_and_accents_do_not_count_as_invented():
+    # Un scan donne souvent "THOMAS GIRARD" ou perd un accent : ce n'est pas une invention.
+    source = "THOMAS GIRARD\nEtablissement des bilans"
+    cv = CV.model_validate({"identity": {"full_name": "Thomas Girard"}, "skills": ["Établissement des bilans"]})
+    assert find_unsupported_values(source, cv) == []
 
 
 def test_long_lines_are_shortened_and_list_is_limited():

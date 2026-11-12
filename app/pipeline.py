@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from pydantic import ValidationError
 
 from app.config import Settings
-from app.coverage import find_missing_lines
+from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
 from app.llm.base import LLMProvider
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
@@ -101,6 +101,11 @@ def process_cv(data: bytes, filename: str, provider: LLMProvider, settings: Sett
         quoted = " ; ".join(f"« {line} »" for line in missing)
         warnings.append(f"À vérifier : ces lignes du CV d'origine ne se retrouvent pas dans le résultat : {quoted}")
         logger.warning("[%s] %d ligne(s) peut-être oubliée(s) par le modèle", filename, len(missing))
+    invented = find_unsupported_values(text, cv)
+    if invented:
+        quoted = " ; ".join(f"« {value} »" for value in invented)
+        warnings.append(f"À vérifier : ces valeurs du résultat ne se retrouvent pas dans le CV d'origine : {quoted}")
+        logger.warning("[%s] %d valeur(s) peut-être inventée(s) par le modèle", filename, len(invented))
 
     with timer.step("html"):
         html = render_html(cv)

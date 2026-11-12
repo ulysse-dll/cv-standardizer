@@ -116,6 +116,7 @@ class Experience(CleanModel):
 class Education(CleanModel):
     degree: str = Field(min_length=1)
     school: Optional[str] = None
+    location: Optional[str] = None
     start: Optional[str] = None
     end: Optional[str] = None
 

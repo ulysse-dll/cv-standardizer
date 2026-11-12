@@ -29,6 +29,16 @@ def test_english_cv_gets_english_headings():
     assert "Experience" in render_html(cv)
 
 
+def test_education_shows_school_and_city():
+    cv = CV.model_validate(
+        {
+            "identity": {"full_name": "Inès Benali"},
+            "education": [{"degree": "Master Marketing digital", "school": "Audencia Business School", "location": "Nantes"}],
+        }
+    )
+    assert "Audencia Business School, Nantes" in render_html(cv)
+
+
 def test_empty_sections_are_hidden():
     html = render_html(CV.model_validate({"identity": {"full_name": "Jean Dupont"}}))
     assert "Jean Dupont" in html
