@@ -158,7 +158,10 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]
     """La colonne grise : compétences, langues, formation, certifications."""
     lines: List[Line] = []
     if cv.skills:
-        text = DOT.join(cv.skills[:max_skills]) + (" …" if len(cv.skills) > max_skills else "")
+        # À l'intérieur d'une compétence courte, les espaces deviennent insécables :
+        # « tests utilisateurs » ne sera pas coupé en deux par un retour à la ligne.
+        shown = [skill.replace(" ", "\u00a0") if len(skill) <= 28 else skill for skill in cv.skills[:max_skills]]
+        text = DOT.join(shown) + (" …" if len(cv.skills) > max_skills else "")
         lines.append(_heading(labels["skills"], not lines))
         lines.append(Line([(text, False, DARK)]))
 

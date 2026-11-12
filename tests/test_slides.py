@@ -25,6 +25,7 @@ def _slide_text(pptx: bytes) -> str:
 def test_slide_contains_the_cv_content():
     pptx, notes = render_pptx(CV.model_validate(VALID_CV))
     text = _slide_text(pptx)
+    text = text.replace("\u00a0", " ")  # la diapo contient des espaces insécables : on les banalise
     for expected in ("Camille Lefèvre", "Développeuse Python", "Novalys", "03/2021 – aujourd'hui",
                      "Master Informatique", "FastAPI", "Anglais — C1", "AWS Cloud Practitioner"):
         assert expected in text
@@ -129,3 +130,9 @@ def test_estimated_height_grows_with_text_and_font_size():
     long = [Line([("Bonjour " * 60, False, None)])]
     assert estimated_height(long, 10, MAIN_TEXT_WIDTH) > estimated_height(short, 10, MAIN_TEXT_WIDTH)
     assert estimated_height(long, 12, MAIN_TEXT_WIDTH) > estimated_height(long, 9, MAIN_TEXT_WIDTH)
+
+
+def test_a_short_skill_is_never_cut_in_two():
+    cv = CV.model_validate({"identity": {"full_name": "Léa Marchand"}, "skills": ["Figma", "tests utilisateurs"]})
+    text = _slide_text(render_pptx(cv)[0])
+    assert "tests\u00a0utilisateurs" in text  # espace insécable entre les deux mots
