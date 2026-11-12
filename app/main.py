@@ -16,6 +16,7 @@ Routes :
 """
 
 import io
+import time
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -86,12 +87,14 @@ def create_app(
         """Ce que l'API renvoie pour un CV (jamais le contenu du fichier d'origine)."""
         base_url = f"/api/batch/{job.id}/items/{item.index}"
         done = item.status == "done"
+        running = item.status == "running" and item.started is not None
         return {
             "index": item.index,
             "filename": item.filename,
             "status": item.status,
             "step": item.step,
             "progress": round(item.progress, 3),
+            "elapsed_seconds": round(time.monotonic() - item.started, 1) if running else None,
             "edited": item.edited,
             "error": item.error,
             "name": item.cv.identity.full_name if item.cv else None,

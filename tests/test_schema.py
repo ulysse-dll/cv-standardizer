@@ -136,3 +136,28 @@ def test_llm_schema_requires_every_field():
     assert set(schema["$defs"]["Experience"]["required"]) == {
         "job_title", "company", "location", "start", "end", "highlights",
     }
+
+
+def test_empty_entries_added_by_the_model_are_dropped():
+    # Vu avec gemma3:4b : une expérience entièrement vide en fin de liste.
+    data = {
+        **VALID_CV,
+        "experiences": VALID_CV["experiences"]
+        + [{"job_title": None, "company": "null", "location": None, "start": None, "end": None, "highlights": []}],
+    }
+    assert len(CV.model_validate(data).experiences) == 1
+
+
+def test_entry_with_content_but_no_title_is_still_refused():
+    # Une entrée qui contient de l'information n'est pas jetée en silence :
+    # la validation échoue, ce qui déclenche le retry.
+    data = {**VALID_CV, "experiences": [{"job_title": None, "company": "Novalys"}]}
+    with pytest.raises(ValidationError):
+        CV.model_validate(data)
+
+
+def test_name_in_capitals_is_rewritten():
+    assert CV.model_validate({"identity": {"full_name": "THOMAS GIRARD"}}).identity.full_name == "Thomas Girard"
+    assert CV.model_validate({"identity": {"full_name": "JEAN-PIERRE D'ARCY"}}).identity.full_name == "Jean-Pierre D'Arcy"
+    # Un nom déjà en minuscules et majuscules n'est pas touché.
+    assert CV.model_validate({"identity": {"full_name": "Inès de la Tour"}}).identity.full_name == "Inès de la Tour"

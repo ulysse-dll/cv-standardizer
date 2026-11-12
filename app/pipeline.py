@@ -27,8 +27,10 @@ MAX_ATTEMPTS = 2  # 1 essai + 1 retry automatique
 # nom de l'étape en cours ("extraction", "llm", "rendu") et une fraction de 0 à 1.
 StepCallback = Callable[[str, float], None]
 # Le JSON produit fait à peu près la longueur du texte du CV, plus les noms
-# des champs (mesuré sur les faux CV). Sert à estimer l'avancement du LLM.
-JSON_OVERHEAD_CHARS = 450
+# des champs : entre 400 et 800 caractères de plus sur les faux CV. On prend
+# large : mieux vaut une barre qui finit d'un coup à 85 % qu'une barre bloquée
+# à 97 %. Sert seulement à estimer l'avancement du LLM.
+JSON_OVERHEAD_CHARS = 700
 
 
 class StructuringError(Exception):

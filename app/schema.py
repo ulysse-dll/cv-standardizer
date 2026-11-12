@@ -25,8 +25,22 @@ def _clean(value: Any) -> Any:
         return None if value.lower() in _EMPTY_MARKERS else value
     if isinstance(value, list):
         cleaned = [_clean(item) for item in value]
-        return [item for item in cleaned if item not in (None, "", [], {})]
+        return [item for item in cleaned if not _is_empty(item)]
     return value
+
+
+def _is_empty(value: Any) -> bool:
+    """Vrai pour une valeur sans aucune information, y compris une entrée de liste
+    dont tous les champs sont vides. Un petit modèle ajoute parfois une telle
+    entrée à la fin d'une liste (une expérience {"job_title": null, ...}) :
+    on la retire, au lieu de refuser tout le CV à cause d'elle."""
+    if isinstance(value, dict):
+        return all(_is_empty(item) for item in value.values())
+    if isinstance(value, list):
+        return all(_is_empty(item) for item in value)
+    if isinstance(value, str):
+        return " ".join(value.split()).lower() in _EMPTY_MARKERS
+    return value is None
 
 
 _MONTHS = {
@@ -102,6 +116,13 @@ class Identity(CleanModel):
     phone: Optional[str] = None
     location: Optional[str] = None
     links: List[str] = Field(default_factory=list)
+
+    @field_validator("full_name")
+    @classmethod
+    def _fix_capitals(cls, value: str) -> str:
+        # Beaucoup de CV écrivent le nom tout en majuscules : "THOMAS GIRARD".
+        # Standardiser, c'est aussi écrire tous les noms de la même façon.
+        return value.title() if value.isupper() else value
 
 
 class Experience(CleanModel):

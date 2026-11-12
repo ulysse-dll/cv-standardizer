@@ -6,106 +6,217 @@
 <title>CV Standardizer</title>
 <style>
   :root {
-    --bg: #f4f5f7; --card: #ffffff; --text: #1f2933; --muted: #616e7c;
-    --line: #d9dee4; --accent: #1f4e79; --ok: #1e7b4f; --error: #b42318; --warn-bg: #fff4e5;
+    --bg: #f3f5f8; --card: #ffffff; --text: #1b2733; --muted: #5d6b7a; --line: #dbe1e8;
+    --accent: #1f4e79; --accent-soft: #e8f0f8; --ok: #17794a; --ok-soft: #e4f4eb;
+    --error: #b42318; --error-soft: #fdeceb; --warn: #7a4a00; --warn-soft: #fff3df;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   body { margin: 0; font: 15px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); }
-  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 22px 16px 48px; }
+
+  /* ----- en-tête ----- */
+  header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 23px; margin: 0; letter-spacing: -0.2px; }
   .muted { color: var(--muted); font-size: 13px; }
-  .banner { margin: 12px 0 20px; padding: 8px 12px; border-radius: 6px; font-size: 13px; background: #e6f4ec; color: #14532d; }
-  .banner.remote { background: #fde8e6; color: var(--error); font-weight: 600; }
-  .layout { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-  #drop { display: block; border: 2px dashed var(--line); border-radius: 8px; padding: 26px 12px; text-align: center; cursor: pointer; }
-  #drop.over { border-color: var(--accent); background: #eef4fa; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: #e9edf2; color: #364452; white-space: nowrap; }
+  .chip.ok { background: var(--ok-soft); color: #115c38; font-weight: 600; }
+  .chip.bad { background: var(--error-soft); color: var(--error); font-weight: 600; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+
+  /* ----- mise en page : liste à gauche, CV à droite ----- */
+  .layout { display: grid; grid-template-columns: minmax(330px, 430px) 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04); }
+
+  #drop { display: block; border: 2px dashed #c3ccd6; border-radius: 10px; padding: 24px 12px; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+  #drop:hover, #drop.over { border-color: var(--accent); background: var(--accent-soft); }
   #drop input { display: none; }
+  #drop strong { display: block; font-size: 15px; }
+
   button, .button {
-    font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
+    font: inherit; font-size: 13px; padding: 5px 11px; border-radius: 7px; border: 1px solid #c8d0d9;
     background: #fff; color: var(--text); cursor: pointer; text-decoration: none; display: inline-block;
   }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 16px; font-size: 14px; }
+  button:hover, .button:hover { border-color: var(--accent); }
+  button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.big { padding: 9px 18px; font-size: 14px; }
   button:disabled { opacity: 0.5; cursor: default; }
   .actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  ul#items { list-style: none; margin: 16px 0 0; padding: 0; }
-  ul#items li { border-top: 1px solid var(--line); padding: 10px 0; }
+
+  /* ----- liste des CV ----- */
+  #summary { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  ul#items { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  ul#items li { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; background: #fff; }
+  ul#items li.selectable { cursor: pointer; }
+  ul#items li.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
   .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .filename { font-weight: 600; overflow-wrap: anywhere; }
-  .status { font-size: 12px; white-space: nowrap; color: var(--muted); }
-  .status.running { color: var(--accent); font-weight: 600; }
-  .status.done { color: var(--ok); font-weight: 600; }
-  .status.error { color: var(--error); font-weight: 600; }
-  .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .filename { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .status { font-size: 12px; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: #eef1f4; color: var(--muted); }
+  .status.running { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .status.done { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+  .status.error { background: var(--error-soft); color: var(--error); font-weight: 600; }
+  .bar { height: 6px; border-radius: 3px; background: #e6ebf0; overflow: hidden; margin: 8px 0 4px; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.9s linear; }
+  /* Tant qu'on ne connaît pas l'avancement : une barre qui va et vient. */
+  .bar.waiting > div { width: 30%; animation: slide 1.4s ease-in-out infinite alternate; }
+  @keyframes slide { from { margin-left: 0; } to { margin-left: 70%; } }
+  .detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
   .detail.error { color: var(--error); }
-  .detail.warning { background: var(--warn-bg); padding: 3px 6px; border-radius: 4px; color: #7a4a00; }
-  .links { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
-  #preview { width: 100%; height: 82vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-  #preview-empty { padding: 60px 16px; text-align: center; }
+  .detail.warning { background: var(--warn-soft); padding: 4px 7px; border-radius: 5px; color: var(--warn); margin-top: 5px; }
+  .links { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ----- panneau de droite ----- */
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tabs button { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 12px; }
+  .tabs button[aria-selected="true"] { background: var(--card); border-color: var(--line); color: var(--text); font-weight: 600; }
+  iframe.view { width: 100%; height: 84vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; display: block; }
+  #pane-empty { padding: 70px 16px; text-align: center; }
+  #pane-text pre { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.55 ui-monospace, Menlo, monospace; }
+
+  /* ----- formulaire de correction ----- */
+  .editor-bar { position: sticky; top: 0; z-index: 1; background: var(--card); padding: 4px 0 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  #edit-message.error { color: var(--error); font-weight: 600; }
+  #edit-message.ok { color: var(--ok); font-weight: 600; }
+  fieldset { border: 0; padding: 0; margin: 16px 0 0; }
+  legend { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--accent); padding: 0; margin-bottom: 6px; }
+  .group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  @media (max-width: 560px) { .group { grid-template-columns: 1fr; } }
+  .group label { font-size: 12px; color: var(--muted); display: block; }
+  .group label.wide { grid-column: 1 / -1; }
+  .group input, .group textarea {
+    display: block; width: 100%; margin-top: 2px; font: inherit; font-size: 14px; color: var(--text);
+    padding: 6px 8px; border: 1px solid #c8d0d9; border-radius: 6px; background: #fff;
+  }
+  .group textarea { resize: vertical; line-height: 1.4; }
+  .group input:focus, .group textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .entry { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fafbfc; }
+  .entry-tools { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+  button.small { font-size: 12px; padding: 2px 8px; }
+  button.danger { color: var(--error); }
 </style>
 </head>
 <body>
 <main>
-  <h1>CV Standardizer</h1>
-  <div class="muted">Dépose des CV (PDF ou DOCX), récupère-les au même format.</div>
-  <div id="banner" class="banner">Chargement de la configuration…</div>
+  <header>
+    <div>
+      <h1>CV Standardizer</h1>
+      <div class="muted">Dépose des CV (PDF, DOCX ou scans), récupère-les tous au même format.</div>
+    </div>
+    <div id="chips" class="chips"><span class="chip">Chargement…</span></div>
+  </header>
 
   <div class="layout">
+    <!-- ================= colonne de gauche : envoi et liste ================= -->
     <section class="card">
       <label id="drop">
         <input id="files" type="file" multiple accept=".pdf,.docx">
         <strong>Clique ou glisse tes CV ici</strong>
-        <div class="muted" id="selection">Aucun fichier choisi</div>
+        <span class="muted" id="selection">PDF ou DOCX, un ou plusieurs</span>
       </label>
       <div class="actions">
-        <button id="start" class="primary" disabled>Standardiser</button>
+        <button id="start" class="primary big" disabled>Standardiser</button>
         <a id="zip" class="button" hidden>Tout télécharger (ZIP)</a>
       </div>
+      <div id="summary" hidden></div>
       <ul id="items"></ul>
     </section>
 
+    <!-- ================= colonne de droite : le CV choisi ================= -->
     <section>
-      <div id="preview-empty" class="card muted">L'aperçu du CV standardisé s'affichera ici.</div>
-      <!-- sandbox : l'aperçu ne peut exécuter aucun script -->
-      <iframe id="preview" sandbox hidden title="Aperçu du CV standardisé"></iframe>
+      <div id="pane-empty" class="card muted">Le CV standardisé s'affichera ici.</div>
+
+      <div id="pane" hidden>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-tab="result">CV standardisé</button>
+          <button role="tab" data-tab="original">Original</button>
+          <button role="tab" data-tab="text">Texte extrait</button>
+          <button role="tab" data-tab="edit">Corriger</button>
+        </div>
+
+        <!-- sandbox : l'aperçu ne peut exécuter aucun script -->
+        <iframe id="pane-result" class="view" sandbox title="CV standardisé"></iframe>
+        <iframe id="pane-original" class="view" title="Fichier d'origine" hidden></iframe>
+
+        <div id="pane-text" class="card" hidden>
+          <div class="muted">Ce que le programme a lu dans le fichier, avant tout LLM. C'est ce texte, et lui seul, que le modèle reçoit.</div>
+          <pre id="source-text"></pre>
+        </div>
+
+        <div id="pane-edit" class="card" hidden>
+          <div class="editor-bar">
+            <button id="save" class="primary">Enregistrer et régénérer</button>
+            <span id="edit-message" class="muted">Corrige ce que le modèle a mal lu. Aucun LLM n'est relancé : c'est immédiat.</span>
+          </div>
+          <div id="form"></div>
+        </div>
+      </div>
     </section>
   </div>
 </main>
 
 <script>
-// ---------- raccourcis vers les éléments de la page ----------
+// ============================================================================
+// Raccourcis et état de la page
+// ============================================================================
 const $ = (id) => document.getElementById(id);
 const drop = $("drop"), input = $("files"), startButton = $("start");
-let chosenFiles = [];      // fichiers choisis, pas encore envoyés
-let pollTimer = null;      // minuterie qui redemande l'état du job
-let startedAt = {};        // heure de début de chaque CV, pour afficher un chrono
 
-const STATUS_LABELS = { pending: "en attente", running: "en cours…", done: "terminé", error: "erreur" };
-const STEP_LABELS = { extraction: "extraction", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF" };
+let chosenFiles = [];   // fichiers choisis, pas encore envoyés
+let job = null;         // dernier état du lot reçu du serveur
+let pollTimer = null;   // minuterie qui redemande l'état du lot
+let selected = null;    // numéro du CV affiché à droite
+let tab = "result";     // onglet affiché à droite
+let originals = {};     // numéro -> fichier d'origine (seulement pour un lot envoyé depuis cette page)
+let versions = {};      // numéro -> compteur, augmenté à chaque correction (pour recharger l'aperçu)
+let shownKey = null;    // ce qui est affiché à droite en ce moment (évite de recharger pour rien)
+let originalUrl = null; // adresse temporaire du PDF d'origine affiché
+let readForm = null;    // fonction qui relit le formulaire de correction
 
-// ---------- 1. bandeau : quel modèle, local ou distant ? ----------
+const STATUS_LABELS = { pending: "en attente", running: "en cours", done: "terminé", error: "erreur" };
+const STEP_LABELS = { extraction: "lecture", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF" };
+const METHOD_LABELS = { "pdf-text": "PDF texte", "pdf-ocr": "PDF scanné (OCR)", docx: "DOCX" };
+const seconds = (value) => value.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " s";
+
+// On construit toujours les éléments avec textContent (jamais innerHTML) : un
+// nom de fichier ou une valeur de CV ne peut donc pas injecter de code dans la page.
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// ============================================================================
+// 1. En-tête : quel modèle, local ou distant, OCR et PDF disponibles ?
+// ============================================================================
 fetch("/api/config").then((r) => r.json()).then((config) => {
-  const banner = $("banner");
-  if (config.remote) {
-    banner.className = "banner remote";
-    banner.textContent = `⚠ Provider distant (${config.provider} · ${config.model}) : le texte des CV quitte cette machine. Faux CV uniquement.`;
-  } else {
-    banner.textContent = `Traitement 100 % local · ${config.provider} · ${config.model}`;
-  }
-  const missing = [];
-  if (!config.ocr_engine) missing.push("OCR indisponible : les PDF scannés seront refusés");
-  if (!config.pdf_engine) missing.push("export PDF indisponible");
-  if (missing.length) banner.textContent += " — " + missing.join(" ; ");
+  const chips = $("chips");
+  chips.replaceChildren();
+  chips.append(config.remote
+    ? element("span", "chip bad", "⚠ Distant : le texte des CV quitte cette machine. Faux CV uniquement.")
+    : element("span", "chip ok", "100 % local"));
+  chips.append(element("span", "chip", `${config.provider} · ${config.model}`));
+  const ocrNames = { tesseract: "Tesseract", "apple-vision": "macOS" };
+  chips.append(config.ocr_engine
+    ? element("span", "chip", `OCR : ${ocrNames[config.ocr_engine] || config.ocr_engine}`)
+    : element("span", "chip warn", "OCR indisponible : PDF scannés refusés"));
+  const pdfNames = { weasyprint: "WeasyPrint", navigateur: "navigateur" };
+  chips.append(config.pdf_engine
+    ? element("span", "chip", `PDF : ${pdfNames[config.pdf_engine] || config.pdf_engine}`)
+    : element("span", "chip warn", "Export PDF indisponible"));
 });
 
-// ---------- 2. choix des fichiers (clic ou glisser-déposer) ----------
+// ============================================================================
+// 2. Choix des fichiers (clic ou glisser-déposer)
+// ============================================================================
 function chooseFiles(fileList) {
   chosenFiles = Array.from(fileList);
   $("selection").textContent = chosenFiles.length
     ? chosenFiles.map((f) => f.name).join(", ")
-    : "Aucun fichier choisi";
+    : "PDF ou DOCX, un ou plusieurs";
   startButton.disabled = chosenFiles.length === 0;
 }
 input.addEventListener("change", () => chooseFiles(input.files));
@@ -117,13 +228,13 @@ drop.addEventListener("drop", (event) => {
   chooseFiles(event.dataTransfer.files);
 });
 
-// ---------- 3. envoi au serveur ----------
+// ============================================================================
+// 3. Envoi au serveur, puis suivi de l'avancement
+// ============================================================================
 startButton.addEventListener("click", async () => {
   const form = new FormData();
   chosenFiles.forEach((file) => form.append("files", file));
   startButton.disabled = true;
-  $("zip").hidden = true;
-  startedAt = {};
 
   const response = await fetch("/api/batch", { method: "POST", body: form });
   if (!response.ok) {
@@ -132,97 +243,324 @@ startButton.addEventListener("click", async () => {
     startButton.disabled = false;
     return;
   }
-  const job = await response.json();
-  // On note le job dans l'adresse de la page : si on la recharge, on le retrouve.
-  history.replaceState(null, "", `?job=${job.job_id}`);
-  render(job);
-  pollTimer = setInterval(() => poll(job.job_id), 2000);  // toutes les 2 secondes
+  // Nouveau lot : on repart d'une page propre.
+  originals = Object.fromEntries(chosenFiles.map((file, index) => [index, file]));
+  versions = {}; selected = null; tab = "result"; shownKey = null;
+  $("zip").hidden = true;
+  const created = await response.json();
+  // On note le lot dans l'adresse de la page : si on la recharge, on le retrouve.
+  history.replaceState(null, "", `?job=${created.job_id}`);
+  follow(created.job_id, created);
 });
 
-// ---------- 3 bis. reprise d'un job existant : adresse /?job=<identifiant> ----------
-const existingJob = new URLSearchParams(location.search).get("job");
-if (existingJob) {
-  poll(existingJob);
-  pollTimer = setInterval(() => poll(existingJob), 2000);
+function follow(jobId, firstState) {
+  clearInterval(pollTimer);
+  if (firstState) update(firstState);
+  poll(jobId);
+  pollTimer = setInterval(() => poll(jobId), 1000);  // toutes les secondes
 }
 
-// ---------- 4. suivi de l'avancement ----------
 async function poll(jobId) {
   const response = await fetch(`/api/batch/${jobId}`);
   if (!response.ok) { clearInterval(pollTimer); return; }
-  const job = await response.json();
-  render(job);
+  update(await response.json());
+}
+
+function update(newState) {
+  job = newState;
   if (job.status === "done") {
     clearInterval(pollTimer);
     startButton.disabled = chosenFiles.length === 0;
     if (job.items.some((item) => item.status === "done")) {
-      $("zip").href = `/api/batch/${jobId}/zip`;
+      $("zip").href = `/api/batch/${job.job_id}/zip`;
       $("zip").hidden = false;
     }
   }
+  // Affiche automatiquement le premier CV prêt, si aucun n'est encore choisi.
+  if (selected === null) {
+    const firstDone = job.items.find((item) => item.status === "done");
+    if (firstDone) selected = firstDone.index;
+  }
+  renderList();
+  renderPane();
 }
 
-// ---------- 5. affichage de la liste ----------
-// On construit les éléments avec textContent (jamais innerHTML) : un nom de
-// fichier ou un nom de candidat ne peut donc pas injecter de code dans la page.
-function element(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
+// Reprise d'un lot existant : adresse /?job=<identifiant>
+const existingJob = new URLSearchParams(location.search).get("job");
+if (existingJob) follow(existingJob);
+
+// ============================================================================
+// 4. La liste des CV (colonne de gauche)
+// ============================================================================
+function progressText(item) {
+  const percent = Math.round(item.progress * 100);
+  if (item.step === "extraction") return "Lecture du fichier…";
+  if (item.step === "llm") return percent > 0 ? `Le modèle écrit le CV : ${percent} %` : "Le modèle lit le CV…";
+  if (item.step === "rendu") return "Mise en page et PDF…";
+  return "Démarrage…";
 }
 
-function render(job) {
+function renderList() {
+  const finished = job.items.filter((item) => item.status === "done" || item.status === "error").length;
+  $("summary").hidden = false;
+  $("summary").textContent = job.status === "done"
+    ? `Lot terminé : ${job.items.filter((item) => item.status === "done").length} CV sur ${job.items.length} standardisés.`
+    : `${finished} CV sur ${job.items.length} traités. Un seul à la fois : le processeur est déjà à 100 %.`;
+
   const list = $("items");
   list.replaceChildren();
-  let firstDone = null;
-
   for (const item of job.items) {
     const line = element("li");
-    const row = element("div", "row");
-    row.append(element("span", "filename", item.name ? `${item.name} — ${item.filename}` : item.filename));
-
-    let statusText = STATUS_LABELS[item.status];
-    if (item.status === "running") {
-      startedAt[item.index] = startedAt[item.index] || Date.now();
-      statusText += ` ${Math.round((Date.now() - startedAt[item.index]) / 1000)} s`;
+    if (item.status === "done") {
+      line.classList.add("selectable");
+      line.addEventListener("click", () => select(item.index));
     }
+    if (item.index === selected) line.classList.add("selected");
+
+    // --- ligne de titre : nom du candidat (ou du fichier) et état ---
+    const row = element("div", "row");
+    row.append(element("span", "name", item.name || item.filename));
+    let statusText = STATUS_LABELS[item.status];
+    if (item.status === "running" && item.elapsed_seconds !== null) statusText += ` · ${Math.round(item.elapsed_seconds)} s`;
+    if (item.status === "done") statusText += ` · ${seconds(item.total_seconds)}`;
     row.append(element("span", `status ${item.status}`, statusText));
     line.append(row);
+    if (item.name) line.append(element("div", "filename", item.filename));
 
+    // --- en cours : barre de progression ---
+    if (item.status === "running") {
+      const known = item.step === "llm" && item.progress > 0;
+      const bar = element("div", known ? "bar" : "bar waiting");
+      const fill = element("div");
+      if (known) fill.style.width = `${Math.round(item.progress * 100)}%`;
+      bar.append(fill);
+      line.append(bar, element("div", "detail", progressText(item)));
+    }
+
+    // --- terminé : durées, téléchargements ---
     if (item.status === "done") {
       const steps = Object.entries(item.timings)
-        .map(([step, seconds]) => `${STEP_LABELS[step] || step} ${seconds} s`).join(" · ");
-      const retry = item.attempts > 1 ? ` · ${item.attempts} essais` : "";
-      line.append(element("div", "detail", `Total ${item.total_seconds} s — ${steps}${retry} (${item.extraction_method})`));
+        .filter(([, value]) => value >= 0.05)  // on masque les étapes instantanées
+        .map(([step, value]) => `${STEP_LABELS[step] || step} ${seconds(value)}`).join(" · ");
+      const notes = [METHOD_LABELS[item.extraction_method] || item.extraction_method, steps];
+      if (item.attempts > 1) notes.push(`${item.attempts} essais`);
+      if (item.edited) notes.push("corrigé à la main");
+      line.append(element("div", "detail", notes.filter(Boolean).join(" · ")));
 
       const links = element("div", "links");
-      const previewButton = element("button", "", "Aperçu");
-      previewButton.addEventListener("click", () => showPreview(item.links.html));
-      links.append(previewButton);
-      for (const kind of ["pdf", "json"]) {
+      for (const [kind, label, primary] of [["pdf", "Télécharger le PDF", true], ["json", "JSON", false]]) {
         if (!item.links[kind]) continue;
-        const link = element("a", "button", kind.toUpperCase());
+        const link = element("a", primary ? "button primary" : "button", label);
         link.href = item.links[kind];
+        link.addEventListener("click", (event) => event.stopPropagation());
         links.append(link);
       }
+      const editButton = element("button", "", "Corriger");
+      editButton.addEventListener("click", (event) => { event.stopPropagation(); select(item.index, "edit"); });
+      links.append(editButton);
       line.append(links);
-      firstDone = firstDone || item;
     }
     if (item.error) line.append(element("div", "detail error", item.error));
     for (const warning of item.warnings) line.append(element("div", "detail warning", warning));
     list.append(line);
   }
-
-  // Affiche automatiquement le premier CV prêt, si rien n'est encore affiché.
-  if (firstDone && $("preview").hidden) showPreview(firstDone.links.html);
 }
 
-function showPreview(url) {
-  $("preview-empty").hidden = true;
-  $("preview").hidden = false;
-  $("preview").src = url;
+function select(index, wantedTab) {
+  selected = index;
+  tab = wantedTab || "result";
+  renderList();
+  renderPane();
 }
+
+// ============================================================================
+// 5. Le panneau de droite : résultat, original, texte extrait, correction
+// ============================================================================
+document.querySelectorAll(".tabs button").forEach((button) => {
+  button.addEventListener("click", () => { tab = button.dataset.tab; renderPane(); });
+});
+
+function renderPane() {
+  const item = job && selected !== null ? job.items[selected] : null;
+  const ready = Boolean(item && item.status === "done");
+  $("pane-empty").hidden = ready;
+  $("pane").hidden = !ready;
+  if (!ready) return;
+
+  // L'onglet "Original" n'existe que si le navigateur a encore le PDF envoyé.
+  const original = originals[selected];
+  const hasOriginal = Boolean(original && original.name.toLowerCase().endsWith(".pdf"));
+  if (tab === "original" && !hasOriginal) tab = "result";
+  document.querySelectorAll(".tabs button").forEach((button) => {
+    button.setAttribute("aria-selected", String(button.dataset.tab === tab));
+    if (button.dataset.tab === "original") button.hidden = !hasOriginal;
+  });
+  for (const name of ["result", "original", "text", "edit"]) $(`pane-${name}`).hidden = name !== tab;
+
+  // Rien n'a changé depuis le dernier affichage ? On ne recharge pas
+  // (sinon l'aperçu clignoterait et le formulaire se viderait à chaque seconde).
+  const key = `${job.job_id}:${selected}:${tab}:${versions[selected] || 0}`;
+  if (key === shownKey) return;
+  shownKey = key;
+
+  const base = `/api/batch/${job.job_id}/items/${selected}`;
+  if (tab === "result") {
+    $("pane-result").src = `${item.links.html}?v=${versions[selected] || 0}`;
+  } else if (tab === "original") {
+    if (originalUrl) URL.revokeObjectURL(originalUrl);
+    originalUrl = URL.createObjectURL(original);  // le fichier reste dans le navigateur
+    $("pane-original").src = originalUrl;
+  } else if (tab === "text") {
+    $("source-text").textContent = "Chargement…";
+    fetch(`${base}/text`).then((r) => r.text()).then((text) => { $("source-text").textContent = text; });
+  } else if (tab === "edit") {
+    $("form").replaceChildren();
+    setEditMessage("Corrige ce que le modèle a mal lu. Aucun LLM n'est relancé : c'est immédiat.", "muted");
+    fetch(`${base}/json?v=${versions[selected] || 0}`).then((r) => r.json()).then(buildForm);
+  }
+}
+
+// ============================================================================
+// 6. Le formulaire de correction
+// ============================================================================
+// Description du formulaire : [nom du champ dans le JSON, libellé, type].
+// Types : "text" (une ligne), "long" (paragraphe), "lines" (liste, une valeur par ligne).
+const DATE_HINT = "MM/AAAA, AAAA ou present";
+const FORM = [
+  { key: "identity", title: "Identité", fields: [
+    ["full_name", "Nom complet"], ["email", "E-mail"], ["phone", "Téléphone"], ["location", "Lieu"],
+    ["links", "Liens (un par ligne)", "lines"]] },
+  { key: "title", title: "Titre du CV", kind: "text" },
+  { key: "summary", title: "Résumé", kind: "long" },
+  { key: "experiences", title: "Expériences", add: "Ajouter une expérience", list: [
+    ["job_title", "Poste"], ["company", "Entreprise"], ["location", "Lieu"],
+    ["start", "Début", "text", DATE_HINT], ["end", "Fin", "text", DATE_HINT],
+    ["highlights", "Réalisations (une par ligne)", "lines"]] },
+  { key: "education", title: "Formation", add: "Ajouter une formation", list: [
+    ["degree", "Diplôme"], ["school", "École"], ["location", "Lieu"],
+    ["start", "Début", "text", DATE_HINT], ["end", "Fin", "text", DATE_HINT]] },
+  { key: "skills", title: "Compétences (une par ligne)", kind: "lines" },
+  { key: "languages", title: "Langues", add: "Ajouter une langue", list: [["name", "Langue"], ["level", "Niveau"]] },
+  { key: "certifications", title: "Certifications", add: "Ajouter une certification", list: [
+    ["name", "Nom"], ["issuer", "Organisme"], ["date", "Date", "text", DATE_HINT]] },
+];
+
+// Fabrique un champ de saisie. Renvoie l'élément et une fonction read() qui
+// redonne la valeur au format attendu par le serveur.
+function makeInput(kind, value, placeholder) {
+  if (kind === "lines" || kind === "long") {
+    const area = element("textarea");
+    area.value = kind === "lines" ? (value || []).join("\n") : (value || "");
+    area.rows = Math.max(2, Math.min(8, area.value.split("\n").length + (kind === "long" ? 2 : 0)));
+    const read = kind === "lines"
+      ? () => area.value.split("\n").map((line) => line.trim()).filter(Boolean)
+      : () => area.value.trim() || null;
+    return { node: area, read };
+  }
+  const field = element("input");
+  field.type = "text";
+  field.value = value || "";
+  if (placeholder) field.placeholder = placeholder;
+  return { node: field, read: () => field.value.trim() || null };
+}
+
+// Un groupe de champs étiquetés (ex. une expérience). read() renvoie un objet.
+function makeGroup(fields, values) {
+  const group = element("div", "group");
+  const readers = {};
+  for (const [key, label, kind = "text", placeholder] of fields) {
+    const { node, read } = makeInput(kind, values ? values[key] : null, placeholder);
+    const wrapper = element("label", kind === "text" ? "" : "wide", label);
+    wrapper.append(node);
+    group.append(wrapper);
+    readers[key] = read;
+  }
+  const read = () => Object.fromEntries(Object.entries(readers).map(([key, reader]) => [key, reader()]));
+  return { node: group, read };
+}
+
+function buildForm(cv) {
+  const form = $("form");
+  form.replaceChildren();
+  const readers = {};
+
+  for (const section of FORM) {
+    const box = element("fieldset");
+    box.append(element("legend", "", section.title));
+
+    if (section.fields) {                       // un objet : l'identité
+      const group = makeGroup(section.fields, cv[section.key]);
+      box.append(group.node);
+      readers[section.key] = group.read;
+    } else if (section.list) {                  // une liste d'objets : expériences, formations...
+      let entries = [];
+      const holder = element("div");
+      const addEntry = (values) => {
+        const group = makeGroup(section.list, values);
+        const card = element("div", "entry");
+        const tools = element("div", "entry-tools");
+        const up = element("button", "small", "↑ Monter");
+        const remove = element("button", "small danger", "Supprimer");
+        const entry = { card, read: group.read };
+        up.addEventListener("click", () => {
+          const position = entries.indexOf(entry);
+          if (position <= 0) return;
+          entries.splice(position, 1);
+          entries.splice(position - 1, 0, entry);
+          holder.insertBefore(card, card.previousElementSibling);
+        });
+        remove.addEventListener("click", () => {
+          entries = entries.filter((other) => other !== entry);
+          card.remove();
+        });
+        tools.append(up, remove);
+        card.append(group.node, tools);
+        holder.append(card);
+        entries.push(entry);
+      };
+      (cv[section.key] || []).forEach(addEntry);
+      const addButton = element("button", "small", `+ ${section.add}`);
+      addButton.addEventListener("click", () => addEntry(null));
+      box.append(holder, addButton);
+      readers[section.key] = () => entries.map((entry) => entry.read());
+    } else {                                    // une valeur simple : titre, résumé, compétences
+      const group = makeGroup([[section.key, "", section.kind]], cv);
+      group.node.querySelector("label").classList.add("wide");
+      box.append(group.node);
+      readers[section.key] = () => group.read()[section.key];
+    }
+    form.append(box);
+  }
+  readForm = () => Object.fromEntries(Object.entries(readers).map(([key, reader]) => [key, reader()]));
+}
+
+function setEditMessage(text, className) {
+  $("edit-message").textContent = text;
+  $("edit-message").className = className;
+}
+
+$("save").addEventListener("click", async () => {
+  if (!readForm || selected === null) return;
+  $("save").disabled = true;
+  setEditMessage("Enregistrement…", "muted");
+  const response = await fetch(`/api/batch/${job.job_id}/items/${selected}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(readForm()),
+  });
+  $("save").disabled = false;
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({}));
+    setEditMessage(typeof problem.detail === "string" ? problem.detail : "L'enregistrement a échoué.", "error");
+    return;
+  }
+  // Le serveur a refait le HTML et le PDF : on met la liste à jour et on montre le résultat.
+  job.items[selected] = await response.json();
+  versions[selected] = (versions[selected] || 0) + 1;
+  tab = "result";
+  renderList();
+  renderPane();
+});
 </script>
 </body>
 </html>

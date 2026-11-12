@@ -157,6 +157,9 @@ def _pdf_with_browser(html: str, browser: str) -> bytes:
             # Vie privée : le navigateur n'a aucune raison d'aller sur Internet.
             # Cette règle fait échouer toute résolution de nom de domaine.
             "--host-resolver-rules=MAP * ~NOTFOUND",
+            # Deuxième verrou : toute connexion passerait par un "proxy" qui
+            # n'existe pas (le port 9 de cette machine), donc échouerait.
+            "--proxy-server=127.0.0.1:9",
             "--disable-background-networking",
             "--disable-component-update",
             # Un profil vide et jetable : on ne touche pas au Chrome de l'utilisateur.

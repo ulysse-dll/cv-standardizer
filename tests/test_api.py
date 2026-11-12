@@ -7,6 +7,7 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 
+from app import batch
 from app.config import Settings
 from app.main import create_app
 from tests.test_pipeline import VALID_JSON, FakeProvider
@@ -139,3 +140,17 @@ def test_invalid_correction_is_refused_and_changes_nothing(client, samples_dir):
 def test_unknown_job_is_a_404(client):
     assert client.get("/api/batch/inconnu").status_code == 404
     assert client.get("/api/batch/inconnu/items/0/json").status_code == 404
+
+
+def test_keep_awake_runs_caffeinate_only_during_the_block():
+    with batch.keep_awake() as process:
+        if process is None:  # pas sur Mac : rien à vérifier
+            return
+        assert process.poll() is None  # caffeinate tourne pendant le lot...
+    assert process.poll() is not None  # ...et s'arrête à la fin
+
+
+def test_keep_awake_does_nothing_without_caffeinate(monkeypatch):
+    monkeypatch.setattr(batch.shutil, "which", lambda name: None)
+    with batch.keep_awake() as process:
+        assert process is None

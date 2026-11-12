@@ -11,14 +11,19 @@ Un seul CV à la fois : le CPU est déjà à 100 % sur un CV, en lancer deux en
 parallèle ne ferait que les ralentir tous les deux.
 """
 
+import os
 import queue
 import re
+import shutil
+import subprocess
 import threading
+import time
 import unicodedata
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from app.config import Settings
 from app.extraction import ExtractionError
@@ -49,6 +54,7 @@ class Item:
     progress: float = 0.0  # avancement de l'étape en cours, de 0 à 1
     source_text: str = ""  # le texte extrait du fichier (pour comparer avec le résultat)
     edited: bool = False  # vrai si l'utilisateur a corrigé le résultat à la main
+    started: Optional[float] = None  # heure de début du traitement (horloge time.monotonic)
 
 
 @dataclass
@@ -66,6 +72,28 @@ def slugify(text: str) -> str:
     """ "Inès Benali" -> "Ines_Benali" : un nom de fichier sans accent ni caractère spécial."""
     ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return re.sub(r"[^A-Za-z0-9]+", "_", ascii_text).strip("_")[:60] or "sans_nom"
+
+
+@contextmanager
+def keep_awake() -> Iterator[Optional[subprocess.Popen]]:
+    """Empêche le Mac de se mettre en veille pendant le bloc `with`.
+
+    Un lot dure longtemps (plus d'une minute par CV). Sans ça, un Mac réglé
+    pour s'endormir vite suspend le traitement dès qu'on s'éloigne du clavier.
+    `caffeinate` est un petit programme fourni avec macOS : tant qu'il tourne,
+    la machine reste éveillée (l'écran, lui, peut s'éteindre).
+    Ailleurs que sur Mac, ce bloc ne fait rien.
+    """
+    command = shutil.which("caffeinate")
+    # -i : pas de veille automatique. -w : caffeinate s'arrête tout seul si
+    # notre serveur s'arrête, même brutalement.
+    process = subprocess.Popen([command, "-i", "-w", str(os.getpid())]) if command else None
+    try:
+        yield process
+    finally:
+        if process:
+            process.terminate()
+            process.wait()
 
 
 class JobQueue:
@@ -99,12 +127,14 @@ class JobQueue:
     def _run(self) -> None:
         while True:
             job = self._queue.get()  # attend ici tant qu'il n'y a rien à faire
-            for item in job.items:
-                self._process(job, item)
+            with keep_awake():
+                for item in job.items:
+                    self._process(job, item)
             job.finished.set()
 
     def _process(self, job: Job, item: Item) -> None:
         item.status = "running"
+        item.started = time.monotonic()
 
         def on_progress(step: str, fraction: float) -> None:
             item.step, item.progress = step, fraction

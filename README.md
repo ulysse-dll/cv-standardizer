@@ -8,9 +8,12 @@ Internet (par défaut).
 ```
 fichier ──► 1. extraction du texte ──► 2. LLM ──► 3. validation ──► 4. génération
             PyMuPDF / python-docx       JSON        Pydantic          HTML ─► PDF
-            OCR Tesseract si scanné     forcé       + 1 retry         + export JSON
-            (aucun LLM ici)
+            OCR si le PDF est scanné    forcé       + 1 retry         + export JSON
+            (aucun LLM ici)                         + 2 contrôles
 ```
+
+Après le passage du modèle, tu peux **corriger le résultat à la main** dans
+la page : le HTML et le PDF sont refaits aussitôt, sans relancer le LLM.
 
 ## 1. Installation
 
@@ -23,15 +26,34 @@ fichier ──► 1. extraction du texte ──► 2. LLM ──► 3. validatio
    ollama pull gemma3:4b
    ```
 
-### b) Python et les bibliothèques système
+### b) Python
 
-Le projet a besoin de Python, plus deux programmes qui ne s'installent pas
-avec `pip` : **Tesseract** (OCR des PDF scannés) et **Pango** (utilisé par
-WeasyPrint pour fabriquer les PDF).
+```sh
+cd ~/cv-standardizer
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Sur un Mac, c'est tout. Deux fonctions s'appuient sur ce que la machine a
+déjà :
+
+| Fonction | Premier choix | Sinon |
+|---|---|---|
+| OCR des PDF scannés | Tesseract, s'il est installé | l'OCR intégré à macOS (framework Vision) |
+| Export PDF | WeasyPrint, si la bibliothèque Pango est installée | Chrome, Chromium, Edge ou Brave, lancé sans fenêtre |
+
+Le bandeau en haut de la page indique lequel est utilisé. S'il n'y a ni l'un
+ni l'autre, l'application démarre quand même : seuls les PDF scannés ou
+l'export PDF sont indisponibles.
+
+### b bis) Facultatif : Tesseract et Pango
+
+Utile seulement hors Mac, ou si tu préfères ces deux outils.
 
 **Mac Intel** — Homebrew ne fournit plus de paquets précompilés pour Intel.
 On passe par micromamba (un seul fichier, sans mot de passe admin) et le
-dépôt conda-forge :
+dépôt conda-forge. Ces commandes n'ont pas été exécutées sur la machine de
+développement : à vérifier à la première utilisation.
 
 ```sh
 # 1. micromamba
@@ -60,11 +82,9 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Sans Tesseract ni Pango, l'application démarre quand même : seuls les PDF
-scannés et l'export PDF sont indisponibles (la page l'indique dans son bandeau).
-
-Dans la suite, les commandes utilisent `env/bin/python`. Si ton environnement
-est un venv, remplace `env/bin/` par `.venv/bin/`.
+Dans la suite, les commandes utilisent `.venv/bin/python`. Si tu as créé
+l'environnement micromamba, remplace `.venv/bin/` par `env/bin/`
+(`./run.sh` choisit tout seul).
 
 ### c) Configuration
 
@@ -80,10 +100,24 @@ Les valeurs par défaut conviennent pour démarrer : tu peux ne rien modifier.
 ./run.sh
 ```
 
-Puis ouvre <http://127.0.0.1:8000>. Dépose un ou plusieurs CV, clique sur
-« Standardiser », regarde l'aperçu, télécharge le PDF ou le JSON.
+Puis ouvre <http://127.0.0.1:8000>. Dépose un ou plusieurs CV et clique sur
+« Standardiser ». Une barre montre l'avancement de chaque CV. Une fois un CV
+prêt, quatre onglets :
+
+- **CV standardisé** : l'aperçu du résultat ;
+- **Original** : le PDF que tu as envoyé, pour comparer (il reste dans le
+  navigateur, donc l'onglet disparaît si tu recharges la page) ;
+- **Texte extrait** : ce que le programme a lu dans le fichier, et que le
+  modèle a reçu. Pratique pour savoir si une erreur vient de la lecture ou
+  du modèle ;
+- **Corriger** : un formulaire pour rectifier le résultat. « Enregistrer et
+  régénérer » refait le HTML, le PDF et le JSON en quelques secondes.
 
 Ollama doit tourner (l'application Ollama ouverte, ou `ollama serve`).
+
+Tu peux lancer un gros lot et t'éloigner : tant qu'il reste des CV à
+traiter, le serveur empêche le Mac de se mettre en veille (avec `caffeinate`,
+un outil fourni avec macOS). L'écran, lui, peut s'éteindre.
 
 ### En ligne de commande
 
@@ -96,6 +130,11 @@ curl -F "files=@samples/cv_classique_fr.pdf" -F "files=@samples/cv_tableaux_fr.d
      http://127.0.0.1:8000/api/batch
 curl http://127.0.0.1:8000/api/batch/<job_id>
 curl -OJ http://127.0.0.1:8000/api/batch/<job_id>/zip
+
+# corriger un résultat : on renvoie le JSON modifié (ici celui du 1er CV, numéro 0)
+curl -o cv.json http://127.0.0.1:8000/api/batch/<job_id>/items/0/json
+curl -X PUT -H "Content-Type: application/json" -d @cv.json \
+     http://127.0.0.1:8000/api/batch/<job_id>/items/0
 ```
 
 La liste complète des routes, testable dans le navigateur : <http://127.0.0.1:8000/docs>
@@ -169,8 +208,8 @@ Chaque étape est chronométrée. Les durées apparaissent :
 - dans un tableau récapitulatif avec :
 
   ```sh
-  env/bin/python -m app.bench            # les 4 faux CV
-  env/bin/python -m app.bench mon_cv.pdf # tes fichiers
+  .venv/bin/python -m app.bench            # les 4 faux CV
+  .venv/bin/python -m app.bench mon_cv.pdf # tes fichiers
   ```
 
 Le premier CV après un démarrage est plus lent : Ollama charge le modèle en
@@ -179,14 +218,14 @@ mémoire (il y reste ensuite 30 minutes, réglable avec `OLLAMA_KEEP_ALIVE`).
 ## 6. Tests
 
 ```sh
-env/bin/python -m pytest
+.venv/bin/python -m pytest
 ```
 
 Les tests n'ont pas besoin d'Ollama : le LLM y est remplacé par un faux qui
 renvoie des réponses écrites d'avance. Les tests d'OCR et de PDF sont sautés
-automatiquement si Tesseract ou Pango manquent.
+automatiquement si la machine n'a aucun moteur pour les faire.
 
-Pour régénérer les faux CV : `env/bin/python samples/generate_samples.py`
+Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 
 ## 7. Le rôle de chaque fichier
 
@@ -194,17 +233,18 @@ Pour régénérer les faux CV : `env/bin/python samples/generate_samples.py`
 |---|---|
 | `app/config.py` | Lit `.env` et expose les réglages |
 | `app/schema.py` | Le schéma du CV (Pydantic), le nettoyage des valeurs, les dates |
-| `app/extraction.py` | Fichier → texte brut (PDF, DOCX, OCR), sans LLM |
+| `app/extraction.py` | Fichier → texte brut (PDF, DOCX), sans LLM |
+| `app/ocr.py` | Image d'une page scannée → texte (Tesseract ou OCR de macOS) |
 | `app/prompts.py` | Les consignes envoyées au modèle |
 | `app/llm/base.py` | L'interface commune à tous les providers |
 | `app/llm/ollama.py` | L'appel à Ollama, avec le paramètre `format` |
 | `app/llm/openai_compat.py` | L'appel au format OpenAI (gemini, custom) |
 | `app/llm/__init__.py` | Choisit le provider d'après `.env`, avec le garde-fou |
 | `app/pipeline.py` | Enchaîne extraction → LLM → validation → retry → rendu |
-| `app/coverage.py` | Repère les lignes du CV d'origine absentes du résultat |
-| `app/render.py` | CV validé → HTML (Jinja2) → PDF (WeasyPrint) |
+| `app/coverage.py` | Deux contrôles sans LLM : lignes oubliées, valeurs inventées |
+| `app/render.py` | CV validé → HTML (Jinja2) → PDF (WeasyPrint ou navigateur) |
 | `app/templates/cv.html` | Le modèle visuel du CV standardisé |
-| `app/batch.py` | La file d'attente : traite les CV un par un en arrière-plan |
+| `app/batch.py` | La file d'attente : traite les CV un par un, enregistre les corrections |
 | `app/main.py` | Les routes HTTP (FastAPI) |
 | `app/static/index.html` | La page web |
 | `app/timing.py` | Le chronomètre par étape et les logs |
@@ -219,14 +259,29 @@ Pour régénérer les faux CV : `env/bin/python samples/generate_samples.py`
 - Les fichiers envoyés ne sont jamais écrits sur le disque. Les résultats
   (JSON, HTML, PDF) sont rangés dans `outputs/`, qui contient donc des
   données personnelles : supprime ce dossier quand tu n'en as plus besoin.
+- L'OCR de macOS tourne sur la machine, sans connexion.
+- Quand le PDF passe par un navigateur, le CV est écrit le temps de la
+  conversion dans un dossier temporaire, supprimé aussitôt. Le navigateur
+  est lancé avec un profil vide, et deux réglages lui coupent le réseau :
+  la résolution des noms de domaine échoue toujours, et toute connexion est
+  dirigée vers un proxy qui n'existe pas. Ce blocage repose sur les options
+  du navigateur ; il n'a pas été contrôlé avec un outil d'écoute réseau.
 - `outputs/`, `logs/` et `.env` sont exclus de git.
 
 ## 9. Limites connues
 
-- Un petit modèle peut oublier une ligne ou mal ranger une information :
-  relis le résultat avant de t'en servir. Un avertissement « À vérifier »
-  signale les lignes du CV d'origine qu'on ne retrouve pas dans le résultat,
-  mais ce contrôle est approximatif et ne remplace pas la relecture.
+- Un petit modèle peut oublier une ligne, mal ranger une information ou
+  ajouter un détail : relis le résultat avant de t'en servir. Deux
+  avertissements « À vérifier » aident : l'un signale les lignes du CV
+  d'origine absentes du résultat, l'autre les valeurs du résultat absentes
+  du CV d'origine. Ces contrôles comparent des mots : ils sont approximatifs
+  et ne remplacent pas la relecture. Par exemple, un organisme déduit du nom
+  d'une certification (« Microsoft » pour « Microsoft PL-300 ») n'est pas
+  signalé.
+- La vitesse dépend du processeur : compte environ une minute et demie par
+  CV d'une page. La barre de progression est une estimation.
+- L'export PDF par le navigateur prend de 1 à 6 secondes selon les moments,
+  sans cause identifiée.
 - Le provider `gemini` n'a pas été essayé avec une vraie clé : seul son
   format de requête est couvert par les tests.
 - Un CV très long est coupé à `MAX_CV_CHARS` caractères (un avertissement s'affiche).
