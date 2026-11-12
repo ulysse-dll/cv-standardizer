@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CV Standardizer</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1f2933; --muted: #616e7c;
+    --line: #d9dee4; --accent: #1f4e79; --ok: #1e7b4f; --error: #b42318; --warn-bg: #fff4e5;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .banner { margin: 12px 0 20px; padding: 8px 12px; border-radius: 6px; font-size: 13px; background: #e6f4ec; color: #14532d; }
+  .banner.remote { background: #fde8e6; color: var(--error); font-weight: 600; }
+  .layout { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  #drop { display: block; border: 2px dashed var(--line); border-radius: 8px; padding: 26px 12px; text-align: center; cursor: pointer; }
+  #drop.over { border-color: var(--accent); background: #eef4fa; }
+  #drop input { display: none; }
+  button, .button {
+    font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: #fff; color: var(--text); cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 16px; font-size: 14px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  ul#items { list-style: none; margin: 16px 0 0; padding: 0; }
+  ul#items li { border-top: 1px solid var(--line); padding: 10px 0; }
+  .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .filename { font-weight: 600; overflow-wrap: anywhere; }
+  .status { font-size: 12px; white-space: nowrap; color: var(--muted); }
+  .status.running { color: var(--accent); font-weight: 600; }
+  .status.done { color: var(--ok); font-weight: 600; }
+  .status.error { color: var(--error); font-weight: 600; }
+  .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .detail.error { color: var(--error); }
+  .detail.warning { background: var(--warn-bg); padding: 3px 6px; border-radius: 4px; color: #7a4a00; }
+  .links { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #preview { width: 100%; height: 82vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  #preview-empty { padding: 60px 16px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CV Standardizer</h1>
+  <div class="muted">Dépose des CV (PDF ou DOCX), récupère-les au même format.</div>
+  <div id="banner" class="banner">Chargement de la configuration…</div>
+
+  <div class="layout">
+    <section class="card">
+      <label id="drop">
+        <input id="files" type="file" multiple accept=".pdf,.docx">
+        <strong>Clique ou glisse tes CV ici</strong>
+        <div class="muted" id="selection">Aucun fichier choisi</div>
+      </label>
+      <div class="actions">
+        <button id="start" class="primary" disabled>Standardiser</button>
+        <a id="zip" class="button" hidden>Tout télécharger (ZIP)</a>
+      </div>
+      <ul id="items"></ul>
+    </section>
+
+    <section>
+      <div id="preview-empty" class="card muted">L'aperçu du CV standardisé s'affichera ici.</div>
+      <!-- sandbox : l'aperçu ne peut exécuter aucun script -->
+      <iframe id="preview" sandbox hidden title="Aperçu du CV standardisé"></iframe>
+    </section>
+  </div>
+</main>
+
+<script>
+// ---------- raccourcis vers les éléments de la page ----------
+const $ = (id) => document.getElementById(id);
+const drop = $("drop"), input = $("files"), startButton = $("start");
+let chosenFiles = [];      // fichiers choisis, pas encore envoyés
+let pollTimer = null;      // minuterie qui redemande l'état du job
+let startedAt = {};        // heure de début de chaque CV, pour afficher un chrono
+
+const STATUS_LABELS = { pending: "en attente", running: "en cours…", done: "terminé", error: "erreur" };
+const STEP_LABELS = { extraction: "extraction", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF" };
+
+// ---------- 1. bandeau : quel modèle, local ou distant ? ----------
+fetch("/api/config").then((r) => r.json()).then((config) => {
+  const banner = $("banner");
+  if (config.remote) {
+    banner.className = "banner remote";
+    banner.textContent = `⚠ Provider distant (${config.provider} · ${config.model}) : le texte des CV quitte cette machine. Faux CV uniquement.`;
+  } else {
+    banner.textContent = `Traitement 100 % local · ${config.provider} · ${config.model}`;
+  }
+  const missing = [];
+  if (!config.ocr_available) missing.push("OCR indisponible (Tesseract absent) : les PDF scannés seront refusés");
+  if (!config.pdf_available) missing.push("export PDF indisponible (Pango absent)");
+  if (missing.length) banner.textContent += " — " + missing.join(" ; ");
+});
+
+// ---------- 2. choix des fichiers (clic ou glisser-déposer) ----------
+function chooseFiles(fileList) {
+  chosenFiles = Array.from(fileList);
+  $("selection").textContent = chosenFiles.length
+    ? chosenFiles.map((f) => f.name).join(", ")
+    : "Aucun fichier choisi";
+  startButton.disabled = chosenFiles.length === 0;
+}
+input.addEventListener("change", () => chooseFiles(input.files));
+drop.addEventListener("dragover", (event) => { event.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (event) => {
+  event.preventDefault();
+  drop.classList.remove("over");
+  chooseFiles(event.dataTransfer.files);
+});
+
+// ---------- 3. envoi au serveur ----------
+startButton.addEventListener("click", async () => {
+  const form = new FormData();
+  chosenFiles.forEach((file) => form.append("files", file));
+  startButton.disabled = true;
+  $("zip").hidden = true;
+  startedAt = {};
+
+  const response = await fetch("/api/batch", { method: "POST", body: form });
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({}));
+    alert(problem.detail || "L'envoi a échoué.");
+    startButton.disabled = false;
+    return;
+  }
+  const job = await response.json();
+  render(job);
+  pollTimer = setInterval(() => poll(job.job_id), 2000);  // toutes les 2 secondes
+});
+
+// ---------- 4. suivi de l'avancement ----------
+async function poll(jobId) {
+  const response = await fetch(`/api/batch/${jobId}`);
+  if (!response.ok) { clearInterval(pollTimer); return; }
+  const job = await response.json();
+  render(job);
+  if (job.status === "done") {
+    clearInterval(pollTimer);
+    startButton.disabled = chosenFiles.length === 0;
+    if (job.items.some((item) => item.status === "done")) {
+      $("zip").href = `/api/batch/${jobId}/zip`;
+      $("zip").hidden = false;
+    }
+  }
+}
+
+// ---------- 5. affichage de la liste ----------
+// On construit les éléments avec textContent (jamais innerHTML) : un nom de
+// fichier ou un nom de candidat ne peut donc pas injecter de code dans la page.
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function render(job) {
+  const list = $("items");
+  list.replaceChildren();
+  let firstDone = null;
+
+  for (const item of job.items) {
+    const line = element("li");
+    const row = element("div", "row");
+    row.append(element("span", "filename", item.name ? `${item.name} — ${item.filename}` : item.filename));
+
+    let statusText = STATUS_LABELS[item.status];
+    if (item.status === "running") {
+      startedAt[item.index] = startedAt[item.index] || Date.now();
+      statusText += ` ${Math.round((Date.now() - startedAt[item.index]) / 1000)} s`;
+    }
+    row.append(element("span", `status ${item.status}`, statusText));
+    line.append(row);
+
+    if (item.status === "done") {
+      const steps = Object.entries(item.timings)
+        .map(([step, seconds]) => `${STEP_LABELS[step] || step} ${seconds} s`).join(" · ");
+      const retry = item.attempts > 1 ? ` · ${item.attempts} essais` : "";
+      line.append(element("div", "detail", `Total ${item.total_seconds} s — ${steps}${retry} (${item.extraction_method})`));
+
+      const links = element("div", "links");
+      const previewButton = element("button", "", "Aperçu");
+      previewButton.addEventListener("click", () => showPreview(item.links.html));
+      links.append(previewButton);
+      for (const kind of ["pdf", "json"]) {
+        if (!item.links[kind]) continue;
+        const link = element("a", "button", kind.toUpperCase());
+        link.href = item.links[kind];
+        links.append(link);
+      }
+      line.append(links);
+      firstDone = firstDone || item;
+    }
+    if (item.error) line.append(element("div", "detail error", item.error));
+    for (const warning of item.warnings) line.append(element("div", "detail warning", warning));
+    list.append(line);
+  }
+
+  // Affiche automatiquement le premier CV prêt, si rien n'est encore affiché.
+  if (firstDone && $("preview").hidden) showPreview(firstDone.links.html);
+}
+
+function showPreview(url) {
+  $("preview-empty").hidden = true;
+  $("preview").hidden = false;
+  $("preview").src = url;
+}
+</script>
+</body>
+</html>
