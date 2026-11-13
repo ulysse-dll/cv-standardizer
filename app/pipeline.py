@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
+from app.fixes import fill_current_jobs
 from app.llm.base import LLMProvider, ProgressCallback
 from app.photo import extract_photo
 from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
@@ -83,6 +84,7 @@ def structure_cv(
         try:
             with timer.step("validation"):
                 cv = CV.model_validate_json(result.text)
+                cv = fill_current_jobs(cv, text)  # correction sans LLM (voir fixes.py)
             return cv, attempt
         except ValidationError as error:
             last_error = summarize_error(error)

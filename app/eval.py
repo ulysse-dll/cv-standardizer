@@ -15,15 +15,13 @@ c'est le seul moyen de savoir si on a amélioré ou cassé quelque chose.
 
 import argparse
 import json
-import re
 import time
-import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from app.config import ROOT_DIR, Settings, get_settings
-from app.coverage import find_missing_lines, find_unsupported_values
+from app.coverage import find_missing_lines, find_unsupported_values, normalize
 from app.extraction import extract_text
 from app.llm import get_provider
 from app.llm.base import LLMProvider
@@ -34,13 +32,6 @@ from app.timing import StepTimer, setup_logging
 SAMPLES_DIR = ROOT_DIR / "samples"
 EXPECTED_DIR = SAMPLES_DIR / "expected"
 CRITERIA = ["identité", "postes", "dates", "réalisations", "formation", "compétences", "langues", "certifs"]
-
-
-def normalize(text: Optional[str]) -> str:
-    """Minuscules, sans accents ni ponctuation : « Lefèvre. » et « lefevre » sont égaux."""
-    text = unicodedata.normalize("NFKD", (text or "").lower())
-    text = "".join(char for char in text if not unicodedata.combining(char))
-    return " ".join(re.findall(r"[a-z0-9]+", text))
 
 
 def overlap(expected: Sequence[Optional[str]], got: Sequence[Optional[str]]) -> float:

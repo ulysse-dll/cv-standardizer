@@ -151,6 +151,15 @@ class Experience(CleanModel):
     end: Optional[str] = None
     highlights: List[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _since_means_still_going(cls, data: Any) -> Any:
+        # Début « depuis janvier 2019 » et pas de fin : le poste est en cours.
+        if isinstance(data, dict) and isinstance(data.get("start"), str) and _is_empty(data.get("end")):
+            if re.match(r"\s*(depuis|since)\b", data["start"], re.IGNORECASE):
+                return {**data, "end": "present"}
+        return data
+
     @field_validator("highlights")
     @classmethod
     def _one_sentence_each(cls, values: List[str]) -> List[str]:

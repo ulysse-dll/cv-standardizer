@@ -16,7 +16,7 @@ laisser passer une erreur. Elle ne remplace pas une relecture.
 
 import re
 import unicodedata
-from typing import Any, Iterator, List
+from typing import Any, Iterator, List, Optional
 
 from app.schema import CV, _DATE_FIELDS, _MONTHS
 
@@ -31,6 +31,13 @@ _IGNORED_WORDS = set(_MONTHS) | {
     "experience", "work", "employment", "history", "professional", "education", "skills",
     "languages", "profile", "summary", "interests", "and", "the", "des", "les",
 }
+
+
+def normalize(text: Optional[str]) -> str:
+    """Minuscules, sans accents ni ponctuation : « Lefèvre. » et « lefevre » sont égaux."""
+    text = unicodedata.normalize("NFKD", (text or "").lower())
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(re.findall(r"[a-z0-9]+", text))
 
 
 def _words(text: str) -> List[str]:

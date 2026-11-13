@@ -3,7 +3,8 @@
 import copy
 
 from app.config import Settings
-from app.eval import CRITERIA, EXPECTED_DIR, evaluate_file, format_table, normalize, overlap, score_cv
+from app.coverage import normalize
+from app.eval import CRITERIA, EXPECTED_DIR, evaluate_file, format_table, overlap, score_cv
 from app.schema import CV
 from tests.test_pipeline import FakeProvider
 from tests.test_schema import VALID_CV
