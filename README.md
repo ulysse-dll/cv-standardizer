@@ -153,7 +153,40 @@ remplace par les initiales.
 
 Sous chaque CV, trois boutons de téléchargement : **PDF**, **PowerPoint**
 et **JSON**. « Tout télécharger (ZIP) » regroupe les trois formats de tout
-le lot.
+le lot, et « PowerPoint du lot » donne un seul fichier avec une diapositive
+par candidat.
+
+Sur Mac, un onglet **Diapositive** montre l'image de la diapositive sans
+avoir à la télécharger.
+
+### Lot anonyme
+
+Coche « Lot anonyme » avant de cliquer sur « Standardiser » : les documents
+sont produits pour un tri à l'aveugle. Le candidat devient « Candidat 01 »,
+sans e-mail, téléphone, adresse, liens ni photo, et son nom est masqué s'il
+apparaît dans le résumé ou les réalisations. Les entreprises, écoles et dates
+restent : elles peuvent suffire à reconnaître quelqu'un. Le texte d'origine
+n'est pas conservé pour ces lots.
+
+### Photo
+
+La photo trouvée dans le CV apparaît dans la diapositive et dans le PDF. Dans
+l'onglet « Corriger », « Changer la photo » (ou « Ajouter une photo ») la
+remplace par une image de ton choix, et « Retirer la photo » l'enlève.
+
+### Lots précédents
+
+Les lots sont enregistrés dans `outputs/` et retrouvés après un redémarrage
+du serveur : la liste « Lots précédents », sous les CV, permet d'y revenir,
+de les corriger encore et de les retélécharger. « Supprimer ce lot » efface
+ses fichiers. Les lots de plus de 30 jours sont supprimés automatiquement
+(réglable avec `OUTPUT_RETENTION_DAYS`, 0 pour tout garder).
+
+### Couleurs et logo
+
+Dans `.env` : `THEME_ACCENT` (couleur principale du PDF et de la
+diapositive), `THEME_STRIPE` (le trait sous le bandeau) et `THEME_LOGO_PATH`
+(un logo en haut à droite de la diapositive). Redémarre le serveur ensuite.
 
 Ollama doit tourner (l'application Ollama ouverte, ou `ollama serve`).
 
@@ -261,11 +294,24 @@ Chaque étape est chronométrée. Les durées apparaissent :
 Le premier CV après un démarrage est plus lent : Ollama charge le modèle en
 mémoire (il y reste ensuite 30 minutes, réglable avec `OLLAMA_KEEP_ALIVE`).
 
-## 6. Tests
+## 6. Tests et banc d'essai
 
 ```sh
 .venv/bin/python -m pytest
 ```
+
+Le **banc d'essai** répond à une autre question : le modèle fait-il du bon
+travail ? Il fait traiter les faux CV par le vrai modèle et compare chaque
+résultat à la bonne réponse (`samples/expected/`), rubrique par rubrique :
+
+```sh
+.venv/bin/python -m app.eval                      # le modèle du .env
+.venv/bin/python -m app.eval --model llama3.2:3b  # un autre, pour comparer
+```
+
+À lancer avant et après tout changement de consigne (`app/prompts.py`) ou de
+modèle. Attention : les faux CV sont courts et propres, une note de 100 ne
+garantit rien sur de vrais CV.
 
 Les tests n'ont pas besoin d'Ollama : le LLM y est remplacé par un faux qui
 renvoie des réponses écrites d'avance. Les tests d'OCR et de PDF sont sautés
@@ -296,7 +342,12 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 | `app/main.py` | Les routes HTTP (FastAPI) |
 | `app/static/index.html` | La page web |
 | `app/timing.py` | Le chronomètre par étape et les logs |
+| `app/fixes.py` | Corrections sans LLM d'après le texte d'origine (poste en cours) |
+| `app/anonymize.py` | La version anonyme d'un CV |
+| `app/preview.py` | L'image de la diapositive, pour la page (Quick Look, Mac) |
+| `app/theme.py` | Couleurs et logo réglables dans `.env` |
 | `app/bench.py` | Mesure de vitesse en ligne de commande |
+| `app/eval.py` | Banc d'essai : note le modèle contre des réponses attendues |
 | `app/check.py` | Diagnostic de l'installation (`python -m app.check`) |
 | `install.sh`, `run.sh`, `Lancer.command` | Installer, lancer, lancer d'un double-clic (Mac) |
 | `Dockerfile`, `docker-compose.yml` | Déploiement sur un serveur Linux (non essayé) |
@@ -318,20 +369,27 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
   la résolution des noms de domaine échoue toujours, et toute connexion est
   dirigée vers un proxy qui n'existe pas. Ce blocage repose sur les options
   du navigateur ; il n'a pas été contrôlé avec un outil d'écoute réseau.
-- La photo du candidat est gardée en mémoire (pas dans un fichier à part)
-  et placée dans la diapositive. La détection de visage est celle de macOS :
-  elle tourne sur la machine.
-- Le serveur ne garde en mémoire que les 30 derniers lots ; les fichiers des
-  lots plus anciens restent dans `outputs/`.
+- La photo du candidat et le texte extrait de son CV sont enregistrés dans
+  le dossier du lot, avec les résultats. La détection de visage est celle de
+  macOS : elle tourne sur la machine.
+- Les lots de plus de 30 jours sont supprimés automatiquement
+  (`OUTPUT_RETENTION_DAYS`), et « Supprimer ce lot » efface un lot tout de
+  suite.
+- Un lot anonyme ne garde ni le nom, ni les coordonnées, ni la photo, ni le
+  texte d'origine.
 - `outputs/`, `logs/` et `.env` sont exclus de git.
 
 ## 9. Déployer sur une autre machine
 
-L'application n'a **pas de mot de passe** : quiconque peut ouvrir la page peut
-envoyer et lire des CV. Elle est faite pour tourner sur la machine de la
-personne qui s'en sert, ou sur un serveur joignable seulement par un accès
-protégé (VPN, reverse proxy avec authentification). Ne l'expose jamais telle
-quelle sur Internet.
+Par défaut l'application n'a **pas de mot de passe** : quiconque peut ouvrir
+la page peut envoyer et lire des CV. C'est sans risque tant qu'elle n'écoute
+que sur ta machine (`127.0.0.1`, le réglage par défaut).
+
+Avant de l'ouvrir à d'autres postes, définis `APP_PASSWORD` dans `.env` : le
+navigateur demandera ce mot de passe (le nom d'utilisateur est libre). C'est
+une protection simple : sans HTTPS, le mot de passe circule en clair sur le
+réseau. Elle convient à un réseau local de confiance, pas à Internet, où il
+faut un accès protégé devant l'application (VPN, ou reverse proxy en HTTPS).
 
 ### Sur un autre Mac
 
@@ -345,9 +403,9 @@ cd cv-standardizer
 C'est le parcours qui a été essayé de bout en bout (copie neuve du dépôt,
 installation, traitement d'un CV).
 
-Pour que d'autres postes du même réseau local y accèdent :
-`HOST=0.0.0.0 ./run.sh`, puis `http://<adresse-du-mac>:8000` depuis les
-autres postes. Tous ceux qui sont sur ce réseau peuvent alors lire les CV.
+Pour que d'autres postes du même réseau local y accèdent : définis
+`APP_PASSWORD`, lance `HOST=0.0.0.0 ./run.sh`, puis ouvre
+`http://<adresse-du-mac>:8000` depuis les autres postes.
 
 ### Sur un serveur Linux, avec Docker
 
@@ -388,13 +446,16 @@ Intel (une à deux minutes par CV).
   estimée, pas mesurée : sur un CV extrême, le texte peut déborder.
 - La diapositive a été contrôlée avec l'aperçu de macOS (Quick Look), pas
   dans PowerPoint ni Keynote, absents de la machine de développement.
-- La page n'affiche pas d'aperçu de la diapositive : il faut la télécharger.
+- L'aperçu de la diapositive dans la page n'existe que sur Mac (il vient de
+  Quick Look). Ailleurs, il faut la télécharger.
 - La photo est choisie d'après la forme des images (portrait ou carré, ni
   minuscule ni très large) et, sur Mac, d'après la présence d'un visage. Elle
   peut être fausse (logo pris pour une photo) ou manquer (photo de profil,
   très petite, ou dans un format que le programme ne lit pas). On peut la
-  retirer, pas encore en ajouter une à la main.
-- Le PDF ne contient pas la photo : seul le modèle de diapositive l'utilise.
+  retirer ou la remplacer à la main.
+- Le poste en cours est reconnu par des mots-clés (« depuis », « aujourd'hui »,
+  « present »...) placés sur la ligne du poste ou la suivante. Une autre
+  tournure ne sera pas vue.
 - Le provider `gemini` n'a pas été essayé avec une vraie clé : seul son
   format de requête est couvert par les tests.
 - Un CV très long est coupé à `MAX_CV_CHARS` caractères (un avertissement s'affiche).

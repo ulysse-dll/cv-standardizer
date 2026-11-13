@@ -19,7 +19,7 @@ from typing import List, Tuple
 
 import httpx
 
-from app import ocr, photo, render
+from app import ocr, photo, preview, render
 from app.config import OUTPUTS_DIR, Settings, get_settings
 from app.llm import ConfigError, get_provider
 from app.schema import CV
@@ -70,6 +70,18 @@ def check_photo() -> Result:
     return INFO, "Photo : pas de détection de visage (hors Mac), choix d'après la forme de l'image seulement."
 
 
+def check_preview() -> Result:
+    if preview.preview_available():
+        return OK, "Aperçu de la diapositive dans la page : disponible (Quick Look)"
+    return INFO, "Aperçu de la diapositive dans la page : indisponible hors Mac (la diapositive reste téléchargeable)."
+
+
+def check_access(settings: Settings) -> Result:
+    if settings.app_password:
+        return OK, "Mot de passe : activé (APP_PASSWORD)"
+    return INFO, "Mot de passe : aucun. À définir (APP_PASSWORD) avant d'ouvrir le serveur au réseau."
+
+
 def check_outputs() -> Result:
     try:
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -111,7 +123,10 @@ def check_llm(settings: Settings) -> List[Result]:
 
 
 def run_checks(settings: Settings) -> List[Result]:
-    return [check_python(), check_outputs(), check_ocr(), check_pdf(), check_pptx(), check_photo(), *check_llm(settings)]
+    return [
+        check_python(), check_outputs(), check_ocr(), check_pdf(), check_pptx(), check_photo(), check_preview(),
+        check_access(settings), *check_llm(settings),
+    ]
 
 
 def main() -> int:
