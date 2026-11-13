@@ -89,6 +89,24 @@ def normalize_date(value: Any) -> Any:
     return value
 
 
+# Fin de phrase : un point (ou ! ?), des espaces, puis une majuscule.
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ])")
+
+
+def split_sentences(text: str) -> List[str]:
+    """ "Refonte du site. Budget de 600 k€." -> deux réalisations au lieu d'une.
+
+    Dans un CV en tableau, plusieurs réalisations sont souvent écrites à la
+    suite dans une même cellule, et le modèle les recopie d'un bloc. On ne
+    coupe que si chaque morceau fait au moins 3 mots : « Travail avec M.
+    Dupont » ou « St. Gobain » ne sont donc pas coupés en deux.
+    """
+    parts = [part.strip() for part in _SENTENCE_END.split(text) if part.strip()]
+    if len(parts) > 1 and all(len(part.split()) >= 3 for part in parts):
+        return parts
+    return [text]
+
+
 class CleanModel(BaseModel):
     """Classe de base : nettoie toutes les valeurs AVANT la validation."""
 
@@ -132,6 +150,11 @@ class Experience(CleanModel):
     start: Optional[str] = None
     end: Optional[str] = None
     highlights: List[str] = Field(default_factory=list)
+
+    @field_validator("highlights")
+    @classmethod
+    def _one_sentence_each(cls, values: List[str]) -> List[str]:
+        return [part for value in values for part in split_sentences(value)]
 
 
 class Education(CleanModel):

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schema import CV, cv_json_schema, normalize_date
+from app.schema import CV, cv_json_schema, normalize_date, split_sentences
 
 VALID_CV = {
     "identity": {
@@ -161,3 +161,25 @@ def test_name_in_capitals_is_rewritten():
     assert CV.model_validate({"identity": {"full_name": "JEAN-PIERRE D'ARCY"}}).identity.full_name == "Jean-Pierre D'Arcy"
     # Un nom déjà en minuscules et majuscules n'est pas touché.
     assert CV.model_validate({"identity": {"full_name": "Inès de la Tour"}}).identity.full_name == "Inès de la Tour"
+
+
+def test_several_sentences_in_one_highlight_are_split():
+    # Vu sur le CV en tableau : le modèle recopie toute la cellule en une seule réalisation.
+    data = {**VALID_CV, "experiences": [{
+        "job_title": "Cheffe de projet",
+        "highlights": ["Refonte du site e-commerce (+35 % de conversion). Budget annuel de 600 k€. Coordination de 3 agences."],
+    }]}
+    assert CV.model_validate(data).experiences[0].highlights == [
+        "Refonte du site e-commerce (+35 % de conversion).", "Budget annuel de 600 k€.", "Coordination de 3 agences.",
+    ]
+
+
+@pytest.mark.parametrize("text", [
+    "Conception d'une API REST (FastAPI, PostgreSQL), 2 millions de requêtes par jour.",
+    "Note de l'App Store passée de 3,1 à 4,4.",
+    "Travail quotidien avec M. Dupont",          # « M. » n'est pas une fin de phrase
+    "Mission pour le groupe St. Gobain Recherche",
+    "Suivi des relances clients.",
+])
+def test_a_single_sentence_is_left_alone(text):
+    assert split_sentences(text) == [text]

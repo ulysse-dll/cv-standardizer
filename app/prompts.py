@@ -4,6 +4,11 @@ Ils sont volontairement courts et en anglais : sur CPU, chaque token lu ou
 écrit coûte du temps, et les petits modèles suivent mieux des consignes
 brèves. La FORME de la réponse n'est pas décrite ici : c'est le JSON Schema
 (paramètre `format`) qui l'impose.
+
+Chaque règle répond à une erreur réellement observée. La règle sur
+"highlights" est longue exprès : avec « max 4 per job », gemma3:4b
+complétait jusqu'à 4 en inventant des réalisations ou en recopiant celles
+du poste voisin.
 """
 
 SYSTEM_PROMPT = """You convert a CV into JSON.
@@ -13,7 +18,7 @@ Rules:
 - experiences: every job and internship in the CV, newest first.
 - education: every degree in the CV, newest first.
 - Dates: "MM/YYYY" or "YYYY".
-- highlights: the job's bullet points, max 4 per job.
+- highlights: only the bullet points written under that job, copied as they are. Never add one, never repeat one. A job with one bullet point gets one highlight.
 - skills: short keywords only.
 - Output minified JSON on one line."""
 
