@@ -70,6 +70,14 @@
   .detail.warning { background: var(--warn-soft); padding: 4px 7px; border-radius: 5px; color: var(--warn); margin-top: 5px; }
   .links { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 
+  .option { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 10px; color: var(--muted); cursor: pointer; }
+  #history { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 12px; }
+  #history h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin: 0 0 6px; }
+  #history a { display: block; padding: 5px 8px; border-radius: 6px; font-size: 13px; color: var(--text); text-decoration: none; }
+  #history a:hover { background: var(--accent-soft); }
+  #history a.current { background: var(--accent-soft); font-weight: 600; }
+  #slide-image { display: block; width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+
   /* ----- panneau de droite ----- */
   .tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
   .tabs button { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 12px; }
@@ -118,12 +126,23 @@
         <strong>Clique ou glisse tes CV ici</strong>
         <span class="muted" id="selection">PDF ou DOCX, un ou plusieurs</span>
       </label>
+      <label class="option" title="« Candidat 01 », sans nom, coordonnées ni photo">
+        <input id="anonymous" type="checkbox"> Lot anonyme (sans nom, coordonnées ni photo)
+      </label>
       <div class="actions">
         <button id="start" class="primary big" disabled>Standardiser</button>
         <a id="zip" class="button" hidden>Tout télécharger (ZIP)</a>
+        <a id="deck" class="button" hidden title="Une diapositive par candidat, dans un seul fichier">PowerPoint du lot</a>
+        <button id="delete-job" class="danger" hidden>Supprimer ce lot</button>
       </div>
       <div id="summary" hidden></div>
       <ul id="items"></ul>
+
+      <div id="history" hidden>
+        <h2>Lots précédents</h2>
+        <div id="history-list"></div>
+        <div id="history-note" class="muted"></div>
+      </div>
     </section>
 
     <!-- ================= colonne de droite : le CV choisi ================= -->
@@ -133,6 +152,7 @@
       <div id="pane" hidden>
         <div class="tabs" role="tablist">
           <button role="tab" data-tab="result">CV standardisé</button>
+          <button role="tab" data-tab="slide">Diapositive</button>
           <button role="tab" data-tab="original">Original</button>
           <button role="tab" data-tab="text">Texte extrait</button>
           <button role="tab" data-tab="edit">Corriger</button>
@@ -142,6 +162,11 @@
         <iframe id="pane-result" class="view" sandbox title="CV standardisé"></iframe>
         <iframe id="pane-original" class="view" title="Fichier d'origine" hidden></iframe>
 
+        <div id="pane-slide" class="card" hidden>
+          <img id="slide-image" alt="Aperçu de la diapositive PowerPoint">
+          <div class="muted" style="margin-top: 8px">Aperçu fabriqué par macOS : le rendu dans PowerPoint peut différer légèrement.</div>
+        </div>
+
         <div id="pane-text" class="card" hidden>
           <div class="muted">Ce que le programme a lu dans le fichier, avant tout LLM. C'est ce texte, et lui seul, que le modèle reçoit.</div>
           <pre id="source-text"></pre>
@@ -150,7 +175,8 @@
         <div id="pane-edit" class="card" hidden>
           <div class="editor-bar">
             <button id="save" class="primary">Enregistrer et régénérer</button>
-            <button id="remove-photo" hidden>Retirer la photo de la diapositive</button>
+            <label id="change-photo" class="button">Changer la photo<input id="photo-file" type="file" accept="image/*" hidden></label>
+            <button id="remove-photo" hidden>Retirer la photo</button>
             <span id="edit-message" class="muted">Corrige ce que le modèle a mal lu. Le PDF et la diapositive sont refaits sans relancer le LLM.</span>
           </div>
           <div id="form"></div>
@@ -177,6 +203,7 @@ let versions = {};      // numéro -> compteur, augmenté à chaque correction (
 let shownKey = null;    // ce qui est affiché à droite en ce moment (évite de recharger pour rien)
 let originalUrl = null; // adresse temporaire du PDF d'origine affiché
 let readForm = null;    // fonction qui relit le formulaire de correction
+let retentionDays = 0;  // durée de conservation des lots, lue dans la configuration
 
 const STATUS_LABELS = { pending: "en attente", running: "en cours", done: "terminé", error: "erreur" };
 const STEP_LABELS = { extraction: "lecture", photo: "photo", llm: "LLM", validation: "validation", html: "HTML", pdf: "PDF", pptx: "PowerPoint" };
@@ -210,6 +237,8 @@ fetch("/api/config").then((r) => r.json()).then((config) => {
   chips.append(config.pdf_engine
     ? element("span", "chip", `PDF : ${pdfNames[config.pdf_engine] || config.pdf_engine}`)
     : element("span", "chip warn", "Export PDF indisponible"));
+  retentionDays = config.retention_days;
+  loadHistory();
 });
 
 // ============================================================================
@@ -237,6 +266,7 @@ drop.addEventListener("drop", (event) => {
 startButton.addEventListener("click", async () => {
   const form = new FormData();
   chosenFiles.forEach((file) => form.append("files", file));
+  form.append("anonymous", $("anonymous").checked ? "true" : "false");
   startButton.disabled = true;
 
   const response = await fetch("/api/batch", { method: "POST", body: form });
@@ -249,7 +279,7 @@ startButton.addEventListener("click", async () => {
   // Nouveau lot : on repart d'une page propre.
   originals = Object.fromEntries(chosenFiles.map((file, index) => [index, file]));
   versions = {}; selected = null; tab = "result"; shownKey = null;
-  $("zip").hidden = true;
+  $("zip").hidden = $("deck").hidden = $("delete-job").hidden = true;
   const created = await response.json();
   // On note le lot dans l'adresse de la page : si on la recharge, on le retrouve.
   history.replaceState(null, "", `?job=${created.job_id}`);
@@ -265,7 +295,15 @@ function follow(jobId, firstState) {
 
 async function poll(jobId) {
   const response = await fetch(`/api/batch/${jobId}`);
-  if (!response.ok) { clearInterval(pollTimer); return; }
+  if (!response.ok) {
+    clearInterval(pollTimer);
+    if (response.status === 404) {  // lot supprimé, ou trop ancien
+      history.replaceState(null, "", location.pathname);
+      $("summary").hidden = false;
+      $("summary").textContent = "Ce lot n'existe plus (supprimé, ou trop ancien).";
+    }
+    return;
+  }
   update(await response.json());
 }
 
@@ -276,8 +314,11 @@ function update(newState) {
     startButton.disabled = chosenFiles.length === 0;
     if (job.items.some((item) => item.status === "done")) {
       $("zip").href = `/api/batch/${job.job_id}/zip`;
-      $("zip").hidden = false;
+      $("deck").href = `/api/batch/${job.job_id}/pptx`;
+      $("zip").hidden = $("deck").hidden = false;
     }
+    if ($("delete-job").hidden) loadHistory();  // le lot vient de finir : il entre dans l'historique
+    $("delete-job").hidden = false;
   }
   // Affiche automatiquement le premier CV prêt, si aucun n'est encore choisi.
   if (selected === null) {
@@ -291,6 +332,34 @@ function update(newState) {
 // Reprise d'un lot existant : adresse /?job=<identifiant>
 const existingJob = new URLSearchParams(location.search).get("job");
 if (existingJob) follow(existingJob);
+
+// ---------- historique : les lots précédents, gardés par le serveur ----------
+async function loadHistory() {
+  const response = await fetch("/api/batches");
+  if (!response.ok) return;
+  const batches = await response.json();
+  $("history").hidden = batches.length === 0;
+  const list = $("history-list");
+  list.replaceChildren();
+  for (const batch of batches) {
+    const when = new Date(batch.created).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    const names = batch.names.join(", ") + (batch.total > batch.names.length ? "…" : "");
+    const label = `${when} · ${batch.done}/${batch.total} CV${batch.anonymous ? " · anonyme" : ""}${names ? " · " + names : ""}`;
+    const link = element("a", job && batch.job_id === job.job_id ? "current" : "", label);
+    link.href = `?job=${batch.job_id}`;
+    list.append(link);
+  }
+  $("history-note").textContent = retentionDays > 0
+    ? `Les lots sont supprimés automatiquement après ${retentionDays} jours.`
+    : "Les lots sont gardés sans limite de durée.";
+}
+
+$("delete-job").addEventListener("click", async () => {
+  if (!job || !confirm("Supprimer ce lot et tous ses fichiers (PDF, PowerPoint, JSON) ? C'est définitif.")) return;
+  const response = await fetch(`/api/batch/${job.job_id}`, { method: "DELETE" });
+  if (response.ok) location.href = location.pathname;  // retour à une page vide
+  else alert("Le lot n'a pas pu être supprimé.");
+});
 
 // ============================================================================
 // 4. La liste des CV (colonne de gauche)
@@ -309,6 +378,7 @@ function renderList() {
   $("summary").textContent = job.status === "done"
     ? `Lot terminé : ${job.items.filter((item) => item.status === "done").length} CV sur ${job.items.length} standardisés.`
     : `${finished} CV sur ${job.items.length} traités. Un seul à la fois : le processeur est déjà à 100 %.`;
+  if (job.anonymous) $("summary").textContent += " Lot anonyme.";
 
   const list = $("items");
   list.replaceChildren();
@@ -325,7 +395,7 @@ function renderList() {
     const who = element("span", "who");
     if (item.links.photo) {  // la photo trouvée dans le CV, en vignette
       const thumbnail = element("img");
-      thumbnail.src = item.links.photo;
+      thumbnail.src = `${item.links.photo}?v=${versions[item.index] || 0}`;
       thumbnail.alt = "";
       who.append(thumbnail);
     }
@@ -401,34 +471,47 @@ function renderPane() {
   // L'onglet "Original" n'existe que si le navigateur a encore le PDF envoyé.
   const original = originals[selected];
   const hasOriginal = Boolean(original && original.name.toLowerCase().endsWith(".pdf"));
+  // L'onglet "Diapositive" n'existe que si le serveur sait en fabriquer l'image (Mac).
+  const hasSlide = Boolean(item.links.slide);
   if (tab === "original" && !hasOriginal) tab = "result";
+  if (tab === "slide" && !hasSlide) tab = "result";
   document.querySelectorAll(".tabs button").forEach((button) => {
     button.setAttribute("aria-selected", String(button.dataset.tab === tab));
     if (button.dataset.tab === "original") button.hidden = !hasOriginal;
+    if (button.dataset.tab === "slide") button.hidden = !hasSlide;
   });
-  for (const name of ["result", "original", "text", "edit"]) $(`pane-${name}`).hidden = name !== tab;
+  for (const name of ["result", "slide", "original", "text", "edit"]) $(`pane-${name}`).hidden = name !== tab;
   $("remove-photo").hidden = !item.has_photo;
+  $("change-photo").hidden = job.anonymous;  // un lot anonyme n'a pas de photo
+  $("change-photo").firstChild.textContent = item.has_photo ? "Changer la photo" : "Ajouter une photo";
 
   // Rien n'a changé depuis le dernier affichage ? On ne recharge pas
   // (sinon l'aperçu clignoterait et le formulaire se viderait à chaque seconde).
-  const key = `${job.job_id}:${selected}:${tab}:${versions[selected] || 0}`;
+  // Le formulaire, lui, ne dépend pas de la version des documents : changer la
+  // photo pendant qu'on corrige ne doit pas effacer la saisie en cours.
+  const version = versions[selected] || 0;
+  const key = `${job.job_id}:${selected}:${tab}:${tab === "edit" ? "" : version}`;
   if (key === shownKey) return;
   shownKey = key;
 
   const base = `/api/batch/${job.job_id}/items/${selected}`;
   if (tab === "result") {
-    $("pane-result").src = `${item.links.html}?v=${versions[selected] || 0}`;
+    $("pane-result").src = `${item.links.html}?v=${version}`;
+  } else if (tab === "slide") {
+    $("slide-image").src = `${item.links.slide}?v=${version}`;
   } else if (tab === "original") {
     if (originalUrl) URL.revokeObjectURL(originalUrl);
     originalUrl = URL.createObjectURL(original);  // le fichier reste dans le navigateur
     $("pane-original").src = originalUrl;
   } else if (tab === "text") {
     $("source-text").textContent = "Chargement…";
-    fetch(`${base}/text`).then((r) => r.text()).then((text) => { $("source-text").textContent = text; });
+    fetch(`${base}/text`).then((r) => r.text()).then((text) => {
+      $("source-text").textContent = text || (job.anonymous ? "(masqué : le texte d'origine contient le nom du candidat)" : "");
+    });
   } else if (tab === "edit") {
     $("form").replaceChildren();
     setEditMessage("Corrige ce que le modèle a mal lu. Le PDF et la diapositive sont refaits sans relancer le LLM.", "muted");
-    fetch(`${base}/json?v=${versions[selected] || 0}`).then((r) => r.json()).then(buildForm);
+    fetch(`${base}/json?v=${version}`).then((r) => r.json()).then(buildForm);
   }
 }
 
@@ -546,15 +629,35 @@ function buildForm(cv) {
   readForm = () => Object.fromEntries(Object.entries(readers).map(([key, reader]) => [key, reader()]));
 }
 
-// Le programme a pu prendre un logo pour la photo : un clic la retire de la diapositive.
-$("remove-photo").addEventListener("click", async () => {
+// ---------- la photo : la retirer (le programme a pu prendre un logo) ou la remplacer ----------
+// Dans les deux cas le serveur refait le PDF et la diapositive ; le formulaire
+// en cours de saisie, lui, n'est pas touché.
+async function photoRequest(options, successMessage) {
   if (selected === null) return;
-  const response = await fetch(`/api/batch/${job.job_id}/items/${selected}/photo`, { method: "DELETE" });
-  if (!response.ok) { setEditMessage("La photo n'a pas pu être retirée.", "error"); return; }
+  setEditMessage("Mise à jour des documents…", "muted");
+  const response = await fetch(`/api/batch/${job.job_id}/items/${selected}/photo`, options);
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({}));
+    setEditMessage(typeof problem.detail === "string" ? problem.detail : "La photo n'a pas pu être modifiée.", "error");
+    return;
+  }
   job.items[selected] = await response.json();
-  renderList();  // la vignette disparaît ; le formulaire en cours n'est pas touché
-  $("remove-photo").hidden = true;
-  setEditMessage("Photo retirée : la diapositive affiche maintenant les initiales.", "ok");
+  versions[selected] = (versions[selected] || 0) + 1;  // l'aperçu et la vignette seront rechargés
+  renderList();
+  renderPane();
+  setEditMessage(successMessage, "ok");
+}
+
+$("remove-photo").addEventListener("click", () =>
+  photoRequest({ method: "DELETE" }, "Photo retirée : les initiales la remplacent."));
+
+$("photo-file").addEventListener("change", () => {
+  const file = $("photo-file").files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file);
+  photoRequest({ method: "PUT", body: form }, "Photo mise à jour dans le PDF et la diapositive.");
+  $("photo-file").value = "";  // pour pouvoir rechoisir le même fichier ensuite
 });
 
 function setEditMessage(text, className) {
