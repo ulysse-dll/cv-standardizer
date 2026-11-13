@@ -12,6 +12,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
+from app.anonymize import anonymize
 from app.config import Settings
 from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
@@ -22,6 +23,7 @@ from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
 from app.slides import render_pptx
+from app.theme import Theme, theme_from_settings
 from app.timing import StepTimer, logger
 
 MAX_ATTEMPTS = 2  # 1 essai + 1 retry automatique
@@ -96,14 +98,51 @@ def structure_cv(
     )
 
 
+@dataclass
+class Documents:
+    """Les fichiers fabriqués à partir d'un CV validé."""
+
+    html: str
+    pdf: Optional[bytes]
+    pptx: bytes
+    warnings: List[str]
+
+
+def build_documents(cv: CV, photo: Optional[bytes], theme: Theme, timer: Optional[StepTimer] = None) -> Documents:
+    """CV validé (+ photo) -> HTML, PDF et diapositive. Aucun LLM ici.
+
+    Sert après le passage du modèle, et à chaque correction faite à la main.
+    """
+    timer = timer or StepTimer(cv.identity.full_name)
+    warnings: List[str] = []
+    with timer.step("html"):
+        html = render_html(cv, photo, theme.accent)
+    pdf = None
+    try:
+        with timer.step("pdf"):
+            pdf = render_pdf(html)
+    except PDFUnavailableError as error:
+        warnings.append(str(error))  # pas de PDF, mais le JSON et l'aperçu restent utilisables
+    with timer.step("pptx"):
+        pptx, slide_notes = render_pptx(cv, photo, theme)
+    # Un CV long ne tient pas toujours sur une diapo : on dit ce qui a été raccourci.
+    warnings.extend(f"Diapositive : {note}." for note in slide_notes)
+    return Documents(html, pdf, pptx, warnings)
+
+
 def process_cv(
     data: bytes,
     filename: str,
     provider: LLMProvider,
     settings: Settings,
     on_progress: Optional[StepCallback] = None,
+    anonymous_number: Optional[int] = None,
 ) -> PipelineResult:
-    """Traite un fichier CV de bout en bout et renvoie le CV structuré."""
+    """Traite un fichier CV de bout en bout et renvoie le CV structuré.
+
+    `anonymous_number` : si on le donne (3, par exemple), le résultat est
+    anonyme : « Candidat 03 », sans coordonnées ni photo.
+    """
     timer = StepTimer(filename)
     warnings: List[str] = []
 
@@ -146,26 +185,26 @@ def process_cv(
         warnings.append(f"À vérifier : ces valeurs du résultat ne se retrouvent pas dans le CV d'origine : {quoted}")
         logger.warning("[%s] %d valeur(s) peut-être inventée(s) par le modèle", filename, len(invented))
 
-    with timer.step("html"):
-        html = render_html(cv)
-    pdf = None
-    try:
-        with timer.step("pdf"):
-            pdf = render_pdf(html)
-    except PDFUnavailableError as error:
-        warnings.append(str(error))  # pas de PDF, mais le JSON et l'aperçu restent utilisables
-    with timer.step("pptx"):
-        pptx, slide_notes = render_pptx(cv, photo)
-    # Un CV long ne tient pas toujours sur une diapo : on dit ce qui a été raccourci.
-    warnings.extend(f"Diapositive : {note}." for note in slide_notes)
+    if anonymous_number is not None:
+        # À partir d'ici, plus rien ne permet de reconnaître la personne.
+        cv, photo, text = anonymize(cv, anonymous_number), None, ""
+        # Les alertes citent des lignes du CV d'origine, où le nom peut figurer : on masque le détail.
+        warnings = [
+            "À vérifier : des écarts avec le CV d'origine ont été relevés (détail masqué : lot anonyme)."
+            if warning.startswith("À vérifier") else warning
+            for warning in warnings
+        ]
+        warnings = list(dict.fromkeys(warnings))  # sans doublon, dans le même ordre
+    documents = build_documents(cv, photo, theme_from_settings(settings), timer)
+    warnings.extend(documents.warnings)
 
     logger.info("[%s] terminé en %.1f s (%d essai(s))", filename, timer.total, attempts)
 
     return PipelineResult(
         cv=cv,
-        html=html,
-        pdf=pdf,
-        pptx=pptx,
+        html=documents.html,
+        pdf=documents.pdf,
+        pptx=documents.pptx,
         photo=photo,
         extraction_method=extraction.method,
         attempts=attempts,

@@ -8,6 +8,7 @@ Deux moteurs PDF : WeasyPrint (qui a besoin de la bibliothèque Pango) et, à
 défaut, un navigateur de la famille Chrome déjà installé sur la machine.
 """
 
+import base64
 import contextlib
 import io
 import re
@@ -41,7 +42,8 @@ LABELS = {
     },
 }
 _FRENCH_WORDS = {"le", "la", "les", "des", "du", "et", "de", "en", "pour", "avec", "dans", "sur", "un", "une"}
-_ENGLISH_WORDS = {"the", "and", "of", "for", "with", "in", "to", "on", "a", "an", "by", "from"}
+# « a » et « on » sont aussi des mots français (« elle a », « on a ») : on ne les compte pas.
+_ENGLISH_WORDS = {"the", "and", "of", "for", "with", "in", "to", "an", "by", "from"}
 
 
 class PDFUnavailableError(Exception):
@@ -66,12 +68,15 @@ def period(start: Optional[str], end: Optional[str], present_label: str = "prese
     return " – ".join(parts)
 
 
-def render_html(cv: CV) -> str:
+def render_html(cv: CV, photo: Optional[bytes] = None, accent: str = "#1F4E79") -> str:
+    """`photo` : la photo du candidat (JPEG), affichée en rond dans l'en-tête. `accent` : la couleur des titres."""
     lang = detect_language(cv)
     labels = LABELS[lang]
     template = _env.get_template("cv.html")
     return template.render(
         cv=cv,
+        photo=base64.b64encode(photo).decode("ascii") if photo else None,
+        accent=accent,
         lang=lang,
         labels=labels,
         period=lambda start, end: period(start, end, labels["present"]),

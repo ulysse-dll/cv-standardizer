@@ -12,14 +12,15 @@
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 10pt; line-height: 1.4; color: #1f2933; margin: 0;
   }
-  header { border-bottom: 2px solid #1f4e79; padding-bottom: 8pt; margin-bottom: 4pt; }
-  h1 { font-size: 22pt; margin: 0; color: #1f4e79; letter-spacing: 0.3pt; }
+  header { border-bottom: 2px solid {{ accent }}; padding-bottom: 8pt; margin-bottom: 4pt; display: flex; align-items: center; gap: 12pt; }
+  .photo { width: 23mm; height: 23mm; border-radius: 50%; object-fit: cover; flex: none; }
+  h1 { font-size: 22pt; margin: 0; color: {{ accent }}; letter-spacing: 0.3pt; }
   .title { font-size: 12pt; margin: 2pt 0 5pt 0; color: #3e4c59; }
   .contact { font-size: 9pt; color: #52606d; }
   .contact span + span::before { content: "  ·  "; }
 
   h2 {
-    font-size: 10pt; text-transform: uppercase; letter-spacing: 1pt; color: #1f4e79;
+    font-size: 10pt; text-transform: uppercase; letter-spacing: 1pt; color: {{ accent }};
     border-bottom: 0.5pt solid #cbd2d9; padding-bottom: 2pt; margin: 13pt 0 6pt 0;
   }
   .entry { margin-bottom: 7pt; page-break-inside: avoid; }
@@ -46,6 +47,9 @@
 <body>
 
 <header>
+  {# La photo est incluse dans le fichier lui-même (texte "base64") : pas de fichier image à part. #}
+  {% if photo %}<img class="photo" src="data:image/jpeg;base64,{{ photo }}" alt="">{% endif %}
+  <div>
   <h1>{{ cv.identity.full_name }}</h1>
   {% if cv.title %}<p class="title">{{ cv.title }}</p>{% endif %}
   <p class="contact">
@@ -54,6 +58,7 @@
     {% if cv.identity.email %}<span>{{ cv.identity.email }}</span>{% endif %}
     {% for link in cv.identity.links %}<span>{{ link }}</span>{% endfor %}
   </p>
+  </div>
 </header>
 
 {% if cv.summary %}

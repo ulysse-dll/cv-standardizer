@@ -192,6 +192,19 @@ def photo_from_docx(data: bytes) -> Optional[bytes]:
     return _choose(candidates)
 
 
+def prepare_photo(image_bytes: bytes) -> bytes:
+    """Une image choisie par l'utilisateur -> photo carrée (JPEG), centrée sur le visage si on en trouve un.
+    Lève ValueError si le fichier n'est pas une image lisible."""
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        image.load()
+    except Exception as error:
+        raise ValueError("Ce fichier n'est pas une image lisible (JPEG ou PNG attendu).") from error
+    image = image.convert("RGB")
+    faces = detect_faces(image)
+    return _to_jpeg(crop_square(image, faces[0] if faces else None))
+
+
 # ------------------------------------------------------ point d'entrée ----
 def extract_photo(data: bytes, filename: str) -> Optional[bytes]:
     """La photo du candidat (JPEG carré), ou None. Ne lève jamais d'erreur :

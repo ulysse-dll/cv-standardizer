@@ -46,6 +46,16 @@ class Settings(BaseSettings):
     max_cv_chars: int = 12000
     ocr_languages: str = "fra+eng"
 
+    # Apparence des documents (voir theme.py)
+    theme_accent: str = "#1F4E79"
+    theme_stripe: str = "#E8A33D"
+    theme_logo_path: str = ""
+
+    # Les lots plus vieux que ce nombre de jours sont supprimés (0 = jamais).
+    output_retention_days: int = 30
+    # Mot de passe demandé par le navigateur (vide = pas de mot de passe).
+    app_password: str = ""
+
     @property
     def is_remote(self) -> bool:
         """Vrai si le texte des CV sort de la machine avec ce provider."""

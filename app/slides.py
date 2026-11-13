@@ -41,6 +41,7 @@ from pptx.util import Inches, Pt
 
 from app.render import LABELS, detect_language, period
 from app.schema import CV
+from app.theme import Theme, hex_to_rgb
 
 # ----- dimensions, en pouces (unité de PowerPoint ; 1 pouce = 72 points) -----
 SLIDE_WIDTH, SLIDE_HEIGHT = 13.333, 7.5  # format 16:9
@@ -117,9 +118,9 @@ def estimated_height(lines: List[Line], size: float, width_inches: float) -> flo
     return total
 
 
-def _heading(text: str, first: bool) -> Line:
+def _heading(text: str, first: bool, accent: RGBColor = ACCENT) -> Line:
     # Pas d'espace au-dessus de la toute première rubrique d'une colonne.
-    return Line([(text.upper(), True, ACCENT)], scale=0.85, space_before=0 if first else 13, heading=True)
+    return Line([(text.upper(), True, accent)], scale=0.85, space_before=0 if first else 13, heading=True)
 
 
 def _detail(main: Optional[str], extra: Optional[str]) -> Optional[Line]:
@@ -154,7 +155,7 @@ def header_lines(cv: CV) -> List[Line]:
     return lines
 
 
-def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]:
+def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS, accent: RGBColor = ACCENT) -> List[Line]:
     """La colonne grise : compétences, langues, formation, certifications."""
     lines: List[Line] = []
     if cv.skills:
@@ -162,11 +163,11 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]
         # « tests utilisateurs » ne sera pas coupé en deux par un retour à la ligne.
         shown = [skill.replace(" ", "\u00a0") if len(skill) <= 28 else skill for skill in cv.skills[:max_skills]]
         text = DOT.join(shown) + (" …" if len(cv.skills) > max_skills else "")
-        lines.append(_heading(labels["skills"], not lines))
+        lines.append(_heading(labels["skills"], not lines, accent))
         lines.append(Line([(text, False, DARK)]))
 
     if cv.languages:
-        lines.append(_heading(labels["languages"], not lines))
+        lines.append(_heading(labels["languages"], not lines, accent))
         for language in cv.languages:
             runs: List[Run] = [(language.name, True, DARK)]
             if language.level:
@@ -174,7 +175,7 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]
             lines.append(Line(runs))
 
     if cv.education:
-        lines.append(_heading(labels["education"], not lines))
+        lines.append(_heading(labels["education"], not lines, accent))
         for index, study in enumerate(cv.education):
             lines.append(Line([(study.degree, True, DARK)], space_before=0 if index == 0 else 5))
             where = ", ".join(part for part in (study.school, study.location) if part)
@@ -183,7 +184,7 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]
                 lines.append(detail)
 
     if cv.certifications:
-        lines.append(_heading(labels["certifications"], not lines))
+        lines.append(_heading(labels["certifications"], not lines, accent))
         for index, certification in enumerate(cv.certifications):
             lines.append(Line([(certification.name, True, DARK)], space_before=0 if index == 0 else 5))
             detail = _detail(certification.issuer, certification.date)
@@ -192,15 +193,15 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS) -> List[Line]
     return lines
 
 
-def main_lines(cv: CV, labels: dict, max_highlights: int) -> List[Line]:
+def main_lines(cv: CV, labels: dict, max_highlights: int, accent: RGBColor = ACCENT) -> List[Line]:
     """La colonne principale : profil et expériences."""
     lines: List[Line] = []
     if cv.summary:
-        lines.append(_heading(labels["summary"], not lines))
+        lines.append(_heading(labels["summary"], not lines, accent))
         lines.append(Line([(cv.summary, False, DARK)]))
 
     if cv.experiences:
-        lines.append(_heading(labels["experiences"], not lines))
+        lines.append(_heading(labels["experiences"], not lines, accent))
         for index, job in enumerate(cv.experiences):
             where = ", ".join(part for part in (job.company, job.location) if part)
             runs = [(job.job_title, True, DARK)]
@@ -219,7 +220,7 @@ SIZES_MAIN = (12, 11.5, 11, 10.5, 10, 9.5, 9)
 SIZES_SIDE = (11, 10.5, 10, 9.5, 9, 8.5, 8)
 
 
-def fit_main(cv: CV, labels: dict) -> Fit:
+def fit_main(cv: CV, labels: dict, accent: RGBColor = ACCENT) -> Fit:
     """Cherche la mise en page la plus lisible qui tient dans la colonne principale.
 
     On essaie d'abord de tout garder en réduisant la police (de 12 à 9 points).
@@ -229,7 +230,7 @@ def fit_main(cv: CV, labels: dict) -> Fit:
     available = BODY_HEIGHT * 72
     most = max((len(job.highlights) for job in cv.experiences), default=0)
     for max_highlights in range(min(most, 6), -1, -1):
-        lines = main_lines(cv, labels, max_highlights)
+        lines = main_lines(cv, labels, max_highlights, accent)
         for size in SIZES_MAIN:
             if estimated_height(lines, size, MAIN_TEXT_WIDTH) <= available:
                 dropped = []
@@ -238,21 +239,21 @@ def fit_main(cv: CV, labels: dict) -> Fit:
                         f"réalisations limitées à {max_highlights} par poste pour tenir sur la diapositive"
                     )
                 return Fit(lines, size, dropped)
-    return Fit(main_lines(cv, labels, 0), 8, ["CV trop long pour une diapositive : le texte peut déborder"])
+    return Fit(main_lines(cv, labels, 0, accent), 8, ["CV trop long pour une diapositive : le texte peut déborder"])
 
 
-def fit_side(cv: CV, labels: dict) -> Fit:
+def fit_side(cv: CV, labels: dict, accent: RGBColor = ACCENT) -> Fit:
     """Même principe pour la colonne grise : police réduite, puis moins de compétences."""
     available = BODY_HEIGHT * 72
     for max_skills in (MAX_SKILLS, 12, 8):
-        lines = side_lines(cv, labels, max_skills)
+        lines = side_lines(cv, labels, max_skills, accent)
         for size in SIZES_SIDE:
             if estimated_height(lines, size, SIDE_TEXT_WIDTH) <= available:
                 dropped = []
                 if max_skills < min(len(cv.skills), MAX_SKILLS):
                     dropped.append(f"compétences limitées à {max_skills} pour tenir sur la diapositive")
                 return Fit(lines, size, dropped)
-    return Fit(side_lines(cv, labels, 8), 8, ["colonne de gauche trop longue : le texte peut déborder"])
+    return Fit(side_lines(cv, labels, 8, accent), 8, ["colonne de gauche trop longue : le texte peut déborder"])
 
 
 # ----------------------------------------------------------- écriture -----
@@ -343,35 +344,73 @@ def _add_photo(slide, cv: CV, photo: Optional[bytes]) -> None:
     run.font.color.rgb = WHITE
 
 
-def render_pptx(cv: CV, photo: Optional[bytes] = None) -> Tuple[bytes, List[str]]:
-    """Renvoie le fichier .pptx (en octets) et la liste de ce qui a dû être raccourci.
+LOGO_HEIGHT = 0.75  # hauteur du logo dans le bandeau, en pouces
 
-    `photo` : l'image du candidat (JPEG ou PNG), ou None.
-    """
-    lang = detect_language(cv)
-    labels = LABELS[lang]
 
+def _add_logo(slide, logo: bytes) -> float:
+    """Pose le logo en haut à droite du bandeau. Renvoie la largeur qu'il occupe (0 si illisible)."""
+    try:
+        picture = slide.shapes.add_picture(io.BytesIO(logo), 0, 0, height=Inches(LOGO_HEIGHT))
+    except Exception:
+        return 0.0
+    picture.left = Inches(SLIDE_WIDTH - EDGE) - picture.width  # calé à droite
+    picture.top = Inches((HEADER_HEIGHT - LOGO_HEIGHT) / 2)
+    return picture.width / Inches(1) + 0.4
+
+
+def new_presentation():
     presentation = Presentation()
     presentation.slide_width = Inches(SLIDE_WIDTH)
     presentation.slide_height = Inches(SLIDE_HEIGHT)
+    presentation.core_properties.author = "CV Standardizer"
+    return presentation
+
+
+def add_cv_slide(presentation, cv: CV, photo: Optional[bytes] = None, theme: Optional[Theme] = None) -> List[str]:
+    """Ajoute à la présentation la diapositive d'un candidat. Renvoie ce qui a dû être raccourci."""
+    theme = theme or Theme()
+    accent, stripe = RGBColor(*hex_to_rgb(theme.accent)), RGBColor(*hex_to_rgb(theme.stripe))
+    labels = LABELS[detect_language(cv)]
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])  # 6 = diapo vide
 
     # Les fonds, du dessous vers le dessus : colonne grise, bandeau, trait de couleur.
     panel_top = HEADER_HEIGHT + STRIPE_HEIGHT
     _rectangle(slide, 0, panel_top, PANEL_WIDTH, SLIDE_HEIGHT - panel_top, PANEL)
-    _rectangle(slide, 0, 0, SLIDE_WIDTH, HEADER_HEIGHT, ACCENT)
-    _rectangle(slide, 0, HEADER_HEIGHT, SLIDE_WIDTH, STRIPE_HEIGHT, STRIPE)
+    _rectangle(slide, 0, 0, SLIDE_WIDTH, HEADER_HEIGHT, accent)
+    _rectangle(slide, 0, HEADER_HEIGHT, SLIDE_WIDTH, STRIPE_HEIGHT, stripe)
 
     _add_photo(slide, cv, photo)
-    _write(slide, HEADER_TEXT_LEFT, 0, HEADER_TEXT_WIDTH, HEADER_HEIGHT, Fit(header_lines(cv), 30), middle=True)
+    logo_width = _add_logo(slide, theme.logo) if theme.logo else 0.0
+    header = Fit(header_lines(cv), 30)
+    _write(slide, HEADER_TEXT_LEFT, 0, HEADER_TEXT_WIDTH - logo_width, HEADER_HEIGHT, header, middle=True)
 
-    side, main = fit_side(cv, labels), fit_main(cv, labels)
+    side, main = fit_side(cv, labels, accent), fit_main(cv, labels, accent)
     _write(slide, EDGE, BODY_TOP, SIDE_TEXT_WIDTH, BODY_HEIGHT, side)
     _write(slide, MAIN_LEFT, BODY_TOP, MAIN_TEXT_WIDTH, BODY_HEIGHT, main)
+    return side.dropped + main.dropped
 
-    presentation.core_properties.title = f"CV - {cv.identity.full_name}"
-    presentation.core_properties.author = "CV Standardizer"
 
+def _to_bytes(presentation) -> bytes:
     buffer = io.BytesIO()
     presentation.save(buffer)
-    return buffer.getvalue(), side.dropped + main.dropped
+    return buffer.getvalue()
+
+
+def render_pptx(cv: CV, photo: Optional[bytes] = None, theme: Optional[Theme] = None) -> Tuple[bytes, List[str]]:
+    """Renvoie le fichier .pptx d'UN candidat (en octets) et la liste de ce qui a dû être raccourci.
+
+    `photo` : l'image du candidat (JPEG ou PNG), ou None. `theme` : couleurs et logo.
+    """
+    presentation = new_presentation()
+    notes = add_cv_slide(presentation, cv, photo, theme)
+    presentation.core_properties.title = f"CV - {cv.identity.full_name}"
+    return _to_bytes(presentation), notes
+
+
+def render_deck(candidates: List[Tuple[CV, Optional[bytes]]], theme: Optional[Theme] = None) -> bytes:
+    """Un seul fichier .pptx pour tout un lot : une diapositive par candidat, dans l'ordre."""
+    presentation = new_presentation()
+    for cv, photo in candidates:
+        add_cv_slide(presentation, cv, photo, theme)
+    presentation.core_properties.title = f"CV standardisés ({len(candidates)})"
+    return _to_bytes(presentation)
