@@ -1,0 +1,69 @@
+{
+  "identity": {
+    "full_name": "Thomas Girard",
+    "email": "thomas.girard@example.com",
+    "phone": "01 44 55 66 77",
+    "location": "12 rue des Tilleuls, 33000 Bordeaux",
+    "links": []
+  },
+  "title": "Comptable général",
+  "summary": null,
+  "experiences": [
+    {
+      "job_title": "Comptable général",
+      "company": "Cabinet Durand et Associés",
+      "location": "Bordeaux",
+      "start": "01/2019",
+      "end": "present",
+      "highlights": [
+        "Tenue de la comptabilité de 45 clients (TPE et artisans).",
+        "Établissement des bilans et des déclarations de TVA"
+      ]
+    },
+    {
+      "job_title": "Aide-comptable",
+      "company": "Transports Lacombe",
+      "location": "Mérignac",
+      "start": "09/2015",
+      "end": "12/2018",
+      "highlights": [
+        "Saisie des factures fournisseurs et rapprochements bancaires.",
+        "Suivi des relances clients"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "DCG (Diplôme de Comptabilité et de Gestion)",
+      "school": "Lycée Gustave Eiffel",
+      "location": "Bordeaux",
+      "start": "2015",
+      "end": null
+    },
+    {
+      "degree": "BTS Comptabilité et Gestion",
+      "school": "Lycée Gustave Eiffel",
+      "location": "Bordeaux",
+      "start": "2013",
+      "end": null
+    }
+  ],
+  "skills": [
+    "Sage 100",
+    "Cegid",
+    "Excel (tableaux croisés dynamiques)",
+    "paie",
+    "fiscalité des PME"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Anglais",
+      "level": "niveau scolaire"
+    }
+  ],
+  "certifications": []
+}

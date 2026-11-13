@@ -1,0 +1,99 @@
+{
+  "identity": {
+    "full_name": "Daniel Okafor",
+    "email": "daniel.okafor@example.org",
+    "phone": "+44 20 7946 0123",
+    "location": "Manchester, UK",
+    "links": [
+      "github.com/dokafor-fake"
+    ]
+  },
+  "title": "Data Analyst",
+  "summary": "Data analyst with 5 years of experience turning messy retail and logistics data into dashboards and clear recommendations for non-technical teams.",
+  "experiences": [
+    {
+      "job_title": "Senior Data Analyst",
+      "company": "Brightcart Ltd",
+      "location": "Manchester",
+      "start": "01/2022",
+      "end": "present",
+      "highlights": [
+        "Built the weekly sales dashboard used by 40 store managers (Power BI).",
+        "Ran pricing A/B tests that increased basket size by 6%.",
+        "Migrated legacy Excel reports to dbt models."
+      ]
+    },
+    {
+      "job_title": "Data Analyst",
+      "company": "Northway Freight",
+      "location": "Leeds",
+      "start": "07/2019",
+      "end": "12/2021",
+      "highlights": [
+        "Automated delivery delay reporting with Python and SQL.",
+        "Cut monthly reporting time from 3 days to 4 hours."
+      ]
+    },
+    {
+      "job_title": "Junior Analyst (Internship)",
+      "company": "City Council of Leeds",
+      "location": "Leeds",
+      "start": "06/2018",
+      "end": "09/2018",
+      "highlights": [
+        "Cleaned and analysed public transport survey data."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "MSc Data Science",
+      "school": "University of Leeds",
+      "location": null,
+      "start": "2018",
+      "end": "2019"
+    },
+    {
+      "degree": "BSc Mathematics",
+      "school": "University of Sheffield",
+      "location": null,
+      "start": "2015",
+      "end": "2018"
+    }
+  ],
+  "skills": [
+    "SQL",
+    "Python (pandas)",
+    "Power BI",
+    "Tableau",
+    "Excel",
+    "A/B testing",
+    "dbt"
+  ],
+  "languages": [
+    {
+      "name": "English",
+      "level": "native"
+    },
+    {
+      "name": "French",
+      "level": "intermediate (B1)"
+    },
+    {
+      "name": "Igbo",
+      "level": "conversational"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Google Data Analytics Certificate",
+      "issuer": "Coursera",
+      "date": "2020"
+    },
+    {
+      "name": "Microsoft PL-300 Power BI Data Analyst",
+      "issuer": null,
+      "date": "2023"
+    }
+  ]
+}

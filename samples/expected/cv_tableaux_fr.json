@@ -1,0 +1,100 @@
+{
+  "identity": {
+    "full_name": "Inès Benali",
+    "email": "ines.benali@example.net",
+    "phone": "01 98 76 54 32",
+    "location": "Nantes, France",
+    "links": []
+  },
+  "title": "Cheffe de projet marketing digital",
+  "summary": "Huit ans d'expérience en marketing digital, dont quatre en pilotage de projets d'acquisition pour des marques grand public. Orientée résultats et données.",
+  "experiences": [
+    {
+      "job_title": "Cheffe de projet marketing digital",
+      "company": "Maison Océane (cosmétiques)",
+      "location": "Nantes",
+      "start": "2020",
+      "end": "2024",
+      "highlights": [
+        "Refonte du site e-commerce (+35 % de conversion).",
+        "Budget annuel de 600 k€.",
+        "Coordination de 3 agences."
+      ]
+    },
+    {
+      "job_title": "Chargée d'acquisition",
+      "company": "VéloVille (mobilité)",
+      "location": "Rennes",
+      "start": "2017",
+      "end": "2020",
+      "highlights": [
+        "Campagnes Google Ads et Meta Ads.",
+        "Baisse du coût d'acquisition de 22 %."
+      ]
+    },
+    {
+      "job_title": "Assistante marketing (alternance)",
+      "company": "Coop Atlantique",
+      "location": "Saint-Nazaire",
+      "start": "2016",
+      "end": "2017",
+      "highlights": [
+        "Newsletter hebdomadaire envoyée à 80 000 adhérents."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master Marketing digital",
+      "school": "Audencia Business School",
+      "location": "Nantes",
+      "start": "2015",
+      "end": "2017"
+    },
+    {
+      "degree": "Licence Économie-Gestion",
+      "school": "Université de Rennes 1",
+      "location": null,
+      "start": "2012",
+      "end": "2015"
+    }
+  ],
+  "skills": [
+    "Google Analytics 4",
+    "Google Ads",
+    "Meta Ads",
+    "HubSpot",
+    "Figma",
+    "Notion",
+    "SEO",
+    "gestion de projet agile",
+    "tests A/B",
+    "gestion de budget"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "natif"
+    },
+    {
+      "name": "Anglais",
+      "level": "C1"
+    },
+    {
+      "name": "Arabe",
+      "level": "courant"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Google Ads Search",
+      "issuer": "Google",
+      "date": "2023"
+    },
+    {
+      "name": "Certification HubSpot Inbound Marketing",
+      "issuer": "HubSpot Academy",
+      "date": "2021"
+    }
+  ]
+}

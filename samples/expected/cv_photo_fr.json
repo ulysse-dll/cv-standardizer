@@ -1,0 +1,78 @@
+{
+  "identity": {
+    "full_name": "Léa Marchand",
+    "email": "lea.marchand@example.org",
+    "phone": "01 55 44 33 22",
+    "location": "Toulouse (31)",
+    "links": [
+      "leamarchand.example"
+    ]
+  },
+  "title": "Designer UX/UI",
+  "summary": "Designer UX/UI avec cinq ans d'expérience sur des applications mobiles et des outils métier. Aime partir du terrain : entretiens utilisateurs, prototypes, tests, puis mesure des résultats.",
+  "experiences": [
+    {
+      "job_title": "Designer UX/UI",
+      "company": "Studio Garonne",
+      "location": "Toulouse",
+      "start": "01/2022",
+      "end": "present",
+      "highlights": [
+        "Refonte de l'application mobile d'une mutuelle : note de l'App Store passée de 3,1 à 4,4.",
+        "Création d'un design system partagé par quatre équipes produit.",
+        "Animation de 30 entretiens utilisateurs par an."
+      ]
+    },
+    {
+      "job_title": "Designer d'interface",
+      "company": "Aérolab",
+      "location": "Blagnac",
+      "start": "09/2019",
+      "end": "12/2021",
+      "highlights": [
+        "Conception des écrans d'un outil de planification de maintenance.",
+        "Tests d'utilisabilité avec les techniciens en atelier."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master Design d'interaction",
+      "school": "Université Toulouse Jean Jaurès",
+      "location": null,
+      "start": "2017",
+      "end": "2019"
+    },
+    {
+      "degree": "Licence Arts appliqués",
+      "school": "Université Bordeaux Montaigne",
+      "location": null,
+      "start": "2014",
+      "end": "2017"
+    }
+  ],
+  "skills": [
+    "Figma",
+    "prototypage",
+    "design system",
+    "tests utilisateurs",
+    "accessibilité (RGAA)",
+    "HTML",
+    "CSS"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Anglais",
+      "level": "courant"
+    },
+    {
+      "name": "Italien",
+      "level": "intermédiaire"
+    }
+  ],
+  "certifications": []
+}

@@ -1,0 +1,97 @@
+{
+  "identity": {
+    "full_name": "Camille Lefèvre",
+    "email": "camille.lefevre@example.com",
+    "phone": "01 23 45 67 89",
+    "location": "Lyon (69)",
+    "links": [
+      "linkedin.com/in/camille-lefevre-faux"
+    ]
+  },
+  "title": "Développeuse back-end Python",
+  "summary": "Développeuse back-end avec six ans d'expérience dans la conception d'API et de pipelines de données. À l'aise en équipe agile, attachée à la qualité du code et aux tests automatisés.",
+  "experiences": [
+    {
+      "job_title": "Développeuse Python senior",
+      "company": "Novalys Logistique",
+      "location": "Lyon",
+      "start": "03/2021",
+      "end": "present",
+      "highlights": [
+        "Conception d'une API REST de suivi de colis (FastAPI, PostgreSQL), 2 millions de requêtes par jour.",
+        "Réduction de 40 % du temps de réponse grâce à la mise en cache Redis.",
+        "Encadrement de deux développeurs juniors."
+      ]
+    },
+    {
+      "job_title": "Développeuse back-end",
+      "company": "Atelier Pixel",
+      "location": "Villeurbanne",
+      "start": "09/2018",
+      "end": "02/2021",
+      "highlights": [
+        "Développement de sites e-commerce sous Django pour des PME régionales.",
+        "Mise en place de l'intégration continue (GitLab CI) et des tests unitaires."
+      ]
+    },
+    {
+      "job_title": "Stagiaire développement",
+      "company": "Mairie de Grenoble",
+      "location": null,
+      "start": "02/2018",
+      "end": "07/2018",
+      "highlights": [
+        "Outil interne de gestion des demandes d'urbanisme."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master Informatique, parcours Génie logiciel",
+      "school": "Université Claude Bernard Lyon 1",
+      "location": null,
+      "start": "2016",
+      "end": "2018"
+    },
+    {
+      "degree": "Licence Informatique",
+      "school": "Université Grenoble Alpes",
+      "location": null,
+      "start": "2013",
+      "end": "2016"
+    }
+  ],
+  "skills": [
+    "Python",
+    "FastAPI",
+    "Django",
+    "PostgreSQL",
+    "Redis",
+    "Docker",
+    "Git",
+    "GitLab CI",
+    "Linux",
+    "pytest"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Anglais",
+      "level": "courant, TOEIC 915"
+    },
+    {
+      "name": "Espagnol",
+      "level": "notions"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Cloud Practitioner",
+      "issuer": "Amazon Web Services",
+      "date": "2022"
+    }
+  ]
+}
