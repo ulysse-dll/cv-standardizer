@@ -223,18 +223,34 @@ La liste complète des routes, testable dans le navigateur : <http://127.0.0.1:8
 Le modèle se règle avec `OLLAMA_MODEL` dans `.env`. N'importe quel modèle
 Ollama convient ; pense à le télécharger d'abord (`ollama pull <nom>`).
 
-| Modèle | Taille | Pour quoi |
-|---|---|---|
-| `gemma3:4b` (défaut) | 3,3 Go | Bon compromis vitesse / qualité, à l'aise en français |
-| `qwen2.5:7b` | 4,7 Go | Plus fiable sur les CV compliqués, nettement plus lent |
-| `llama3.2:3b` | 2,0 Go | Plus rapide, moins précis |
+Trois modèles ont été notés avec le banc d'essai (section 6), sur les 5 faux
+CV, sur un Mac mini Intel i5-8500B sans carte graphique :
+
+| Modèle | Taille | Note sur 100 | Temps moyen par CV | Ce qu'on observe |
+|---|---|---|---|---|
+| `gemma3:4b` (défaut) | 3,3 Go | 100 | 55 s | Tout est juste sur les 5 CV |
+| `qwen2.5:3b` | 1,9 Go | 86 | 58 s | Oublie des postes entiers sur 2 CV |
+| `llama3.2:3b` | 2,0 Go | 85 | 62 s | Oublie des postes et des diplômes sur 3 CV |
+
+Les deux petits modèles ne sont pas plus rapides en pratique et perdent du
+contenu : `gemma3:4b` reste le bon choix. Les temps de `gemma3:4b` ont été
+pris machine au repos ; ceux des deux autres pendant que d'autres tâches
+tournaient, ils sont donc un peu pessimistes. `qwen2.5:7b` (4,7 Go) n'a pas
+été noté : attends-toi à nettement plus lent.
+
+Une piste a été essayée puis abandonnée : faire désigner au modèle les
+numéros des lignes du CV (pour les réalisations et le résumé) au lieu de les
+lui faire recopier. Avec `gemma3:4b`, la note tombe à 36 sur 100 : sur 3 CV
+sur 5 le modèle écrit des numéros sans s'arrêter, et sur les autres il perd
+des réalisations, sans gagner de temps.
 
 Règle pratique sur CPU : le temps est proportionnel au nombre de tokens
 écrits par le modèle. Un CV d'une page, c'est environ 500 tokens lus et 600
 écrits.
 
 Mesuré sur un Mac mini Intel i5-8500B (6 cœurs, sans GPU) avec `gemma3:4b` :
-environ 8 tokens par seconde, soit **65 à 90 secondes par CV d'une page**.
+environ 8 tokens par seconde, soit **50 à 90 secondes par CV d'une page**
+selon ce que la machine fait d'autre.
 L'extraction, la validation et le rendu HTML prennent moins de 0,1 seconde :
 tout le temps passe dans le LLM.
 
