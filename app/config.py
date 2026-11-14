@@ -41,9 +41,6 @@ class Settings(BaseSettings):
     custom_model: str = ""
     custom_api_key: str = ""
 
-    # "text" : le modèle recopie les réalisations. "refs" (expérimental) : il
-    # donne les numéros des lignes et Python recopie (voir refs.py).
-    llm_copy_mode: Literal["text", "refs"] = "text"
     llm_timeout_s: int = 900
     llm_max_output_tokens: int = 2500
     max_cv_chars: int = 12000

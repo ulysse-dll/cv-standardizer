@@ -111,7 +111,7 @@ def evaluate_file(path: Path, provider: LLMProvider, settings: Settings) -> Row:
     started = time.monotonic()
     try:
         text = extract_text(path.read_bytes(), path.name, settings.ocr_languages).text[: settings.max_cv_chars]
-        cv, row.attempts = structure_cv(text, provider, StepTimer(path.name), copy_mode=settings.llm_copy_mode)
+        cv, row.attempts = structure_cv(text, provider, StepTimer(path.name))
     except Exception as error:  # un échec compte pour zéro, et on passe au CV suivant
         row.error = str(error)
         row.scores = {name: 0.0 for name in CRITERIA}
@@ -145,7 +145,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Note le modèle sur les faux CV dont on connaît la bonne réponse.")
     parser.add_argument("files", nargs="*", help="fichiers de samples/ à évaluer (par défaut : tous)")
     parser.add_argument("--model", help="modèle Ollama à essayer à la place de celui du .env")
-    parser.add_argument("--copy-mode", choices=["text", "refs"], help="text ou refs (voir refs.py), à la place de celui du .env")
     parser.add_argument("--json", dest="json_path", help="fichier où enregistrer le détail des notes")
     arguments = parser.parse_args()
 
@@ -153,8 +152,6 @@ def main() -> None:
     settings = get_settings()
     if arguments.model:
         settings = settings.model_copy(update={"ollama_model": arguments.model})
-    if arguments.copy_mode:
-        settings = settings.model_copy(update={"llm_copy_mode": arguments.copy_mode})
     provider = get_provider(settings)
 
     paths = [Path(name) for name in arguments.files] or sorted(
@@ -166,7 +163,7 @@ def main() -> None:
         rows.append(row)
         print(f"{row.filename} : {row.total:.0f}/100 en {row.seconds:.0f} s" + (f" (ÉCHEC : {row.error})" if row.error else ""), flush=True)
 
-    print(f"\nModèle : {provider.model} ({provider.name}), mode {settings.llm_copy_mode} — notes sur 100")
+    print(f"\nModèle : {provider.model} ({provider.name}) — notes sur 100")
     print(format_table(rows))
     if arguments.json_path:
         detail = {"model": provider.model, "rows": [{**row.__dict__, "total": row.total} for row in rows]}

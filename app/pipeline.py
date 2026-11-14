@@ -7,7 +7,6 @@
 Chaque étape est chronométrée (timing.py).
 """
 
-import json
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -20,8 +19,7 @@ from app.extraction import ExtractionResult, extract_text
 from app.fixes import fill_current_jobs
 from app.llm.base import LLMProvider, ProgressCallback
 from app.photo import extract_photo
-from app import refs
-from app.prompts import build_retry_prompt, build_user_prompt, system_prompt
+from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
 from app.slides import render_pptx
@@ -68,28 +66,16 @@ def summarize_error(error: ValidationError) -> str:
 
 
 def structure_cv(
-    text: str,
-    provider: LLMProvider,
-    timer: StepTimer,
-    on_progress: Optional[ProgressCallback] = None,
-    copy_mode: str = "text",
+    text: str, provider: LLMProvider, timer: StepTimer, on_progress: Optional[ProgressCallback] = None
 ) -> Tuple[CV, int]:
-    """Demande au LLM de structurer le texte. Renvoie le CV validé et le nombre d'essais.
-
-    copy_mode="refs" : mode expérimental où le modèle désigne les lignes par
-    leur numéro au lieu de les recopier (voir refs.py).
-    """
-    use_refs = copy_mode == "refs"
-    schema, system, shown_text, segments = cv_json_schema(), system_prompt(), text, []
-    if use_refs:
-        shown_text, segments = refs.number_lines(text)
-        schema, system = refs.refs_schema(schema), system_prompt(refs.REFS_RULES)
-    user_prompt = build_user_prompt(shown_text)
+    """Demande au LLM de structurer le texte. Renvoie le CV validé et le nombre d'essais."""
+    schema = cv_json_schema()
+    user_prompt = build_user_prompt(text)
     last_error = ""
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         with timer.step("llm"):
-            result = provider.generate_json(system, user_prompt, schema, on_progress)
+            result = provider.generate_json(SYSTEM_PROMPT, user_prompt, schema, on_progress)
         logger.info(
             "[%s] essai %d : %s tokens lus, %s tokens écrits, %s tokens/s",
             timer.label, attempt, result.prompt_tokens, result.output_tokens, result.tokens_per_second,
@@ -99,17 +85,13 @@ def structure_cv(
 
         try:
             with timer.step("validation"):
-                if use_refs:
-                    # Les numéros de lignes redeviennent du texte, puis validation habituelle.
-                    cv = CV.model_validate(refs.resolve(json.loads(result.text), segments))
-                else:
-                    cv = CV.model_validate_json(result.text)
+                cv = CV.model_validate_json(result.text)
                 cv = fill_current_jobs(cv, text)  # correction sans LLM (voir fixes.py)
             return cv, attempt
-        except (ValidationError, json.JSONDecodeError) as error:
-            last_error = summarize_error(error) if isinstance(error, ValidationError) else f"invalid JSON: {error}"
+        except ValidationError as error:
+            last_error = summarize_error(error)
             logger.warning("[%s] essai %d invalide : %s", timer.label, attempt, last_error)
-            user_prompt = build_retry_prompt(shown_text, last_error)
+            user_prompt = build_retry_prompt(text, last_error)
 
     raise StructuringError(
         f"Le modèle n'a pas produit de CV valide après {MAX_ATTEMPTS} essais ({last_error})."
@@ -188,8 +170,7 @@ def process_cv(
     expected_chars = len(text) + JSON_OVERHEAD_CHARS
     report("llm")
     cv, attempts = structure_cv(
-        text, provider, timer, lambda written: report("llm", min(written / expected_chars, 0.97)),
-        copy_mode=settings.llm_copy_mode,
+        text, provider, timer, lambda written: report("llm", min(written / expected_chars, 0.97))
     )
     report("rendu")
 
