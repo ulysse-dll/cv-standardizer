@@ -166,7 +166,9 @@ sont produits pour un tri à l'aveugle. Le candidat devient « Candidat 01 »,
 sans e-mail, téléphone, adresse, liens ni photo, et son nom est masqué s'il
 apparaît dans le résumé ou les réalisations. Les entreprises, écoles et dates
 restent : elles peuvent suffire à reconnaître quelqu'un. Le texte d'origine
-n'est pas conservé pour ces lots.
+n'est pas conservé pour ces lots. Le nom du fichier envoyé, lui, reste
+affiché dans la page et noté dans `job.json` (pas dans les documents) :
+renomme tes fichiers avant l'envoi s'ils contiennent le nom du candidat.
 
 ### Photo
 
