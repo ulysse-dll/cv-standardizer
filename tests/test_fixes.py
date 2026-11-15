@@ -131,3 +131,22 @@ def test_real_interests_are_kept_but_years_and_duplicates_are_removed():
     source = "Centres d'intérêt\nCyclisme sur route\nPhotographie argentique"
     cv = _with_interests("Cyclisme sur route", "2003", "Figma", "Photographie argentique", skills=["Figma"])
     assert clean_interests(cv, source).interests == ["Cyclisme sur route", "Photographie argentique"]
+
+
+def test_certification_filed_under_interests_goes_back_to_certifications():
+    # Vu avec gemma3:4b sur le CV long : la 3e certification et sa date dans les centres d'intérêt.
+    source = ("Langues\nFrançais (langue maternelle)\nCertifications\nGreen Belt Lean Six Sigma — AFNOR, 2016\n"
+              "CACES R489 catégories 1, 3 et 5, 2003")
+    cv = _with_interests("CACES R489 catégories 1, 3 et 5", "2003",
+                         certifications=[{"name": "Green Belt Lean Six Sigma", "issuer": "AFNOR", "date": "2016"}])
+    cv = clean_interests(cv, source)
+    assert cv.interests == []
+    assert [(item.name, item.date) for item in cv.certifications] == [
+        ("Green Belt Lean Six Sigma", "2016"), ("CACES R489 catégories 1, 3 et 5", "2003"),
+    ]
+
+
+def test_a_language_filed_under_interests_is_not_turned_into_a_certification():
+    source = "Certifications\nAFGSU niveau 2, 2022\nLangues\nEspéranto"
+    cv = clean_interests(_with_interests("Espéranto"), source)
+    assert cv.interests == [] and cv.certifications == []

@@ -13,7 +13,7 @@ import re
 from typing import List, Optional
 
 from app.coverage import normalize
-from app.schema import CV
+from app.schema import CV, Certification
 
 # Les mots qui disent qu'un poste dure encore.
 _STILL_GOING = re.compile(
@@ -147,15 +147,55 @@ _INTERESTS_HEADING = re.compile(
 )
 
 
+# Les titres de rubrique d'un CV, pour savoir « sous quel titre » se trouve une ligne.
+_CERTIFICATIONS_HEADING = re.compile(r"^(certifications?|certificates?|habilitations?)\b", re.IGNORECASE)
+_OTHER_HEADING = re.compile(
+    r"^(exp[ée]riences?|parcours|formations?|education|dipl[ôo]mes?|comp[ée]tences|skills|langues|languages"
+    r"|profil|profile|summary|r[ée]sum[ée]|coordonn[ée]es|contact|centres? d.int[ée]r[êe]ts?|interests|loisirs|hobbies)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_under_certifications(lines: List[str], index: int) -> bool:
+    """La ligne n° index est-elle dans la rubrique « Certifications » du CV ?
+    On remonte jusqu'au premier titre de rubrique rencontré (une ligne courte)."""
+    for line in reversed(lines[:index]):
+        if len(line.split()) <= 5:
+            if _CERTIFICATIONS_HEADING.match(line.strip()):
+                return True
+            if _OTHER_HEADING.match(line.strip()):
+                return False
+    return False
+
+
+def _rescue_certifications(cv: CV, source_text: str) -> None:
+    """Un « centre d'intérêt » qui est en réalité une ligne de la rubrique
+    Certifications du CV retourne parmi les certifications (vu sur un CV long :
+    la dernière certification et sa date rangées dans les centres d'intérêt)."""
+    lines = source_text.splitlines()
+    known = {normalize(item.name) for item in cv.certifications}
+    for interest in cv.interests:
+        wanted = normalize(interest)
+        if not wanted or wanted in known or re.fullmatch(r"\d{4}", interest.strip()):
+            continue
+        index = next((i for i, line in enumerate(lines) if wanted in normalize(line)), None)
+        if index is not None and _is_under_certifications(lines, index):
+            years = re.findall(r"\b(?:19|20)\d{2}\b", lines[index].replace(interest, ""))
+            cv.certifications.append(Certification(name=interest, date=years[-1] if years else None))
+            known.add(wanted)
+
+
 def clean_interests(cv: CV, source_text: str) -> CV:
     """Retire les faux centres d'intérêt.
 
     Depuis que le CV a une rubrique « centres d'intérêt », le modèle y range
     parfois ce qu'il ne sait pas placer (vu : une certification et sa date).
-    Si le CV d'origine n'a aucune rubrique de ce genre, la liste est vidée.
-    Dans tous les cas, on retire une année seule et ce qui figure déjà dans
-    les compétences ou les certifications.
+    Une certification égarée là est d'abord remise à sa place. Ensuite, si
+    le CV d'origine n'a aucune rubrique de centres d'intérêt, la liste est
+    vidée ; sinon on en retire une année seule et ce qui figure déjà dans les
+    compétences ou les certifications.
     """
+    _rescue_certifications(cv, source_text)
     if not _INTERESTS_HEADING.search(source_text):
         cv.interests = []
         return cv
