@@ -251,6 +251,17 @@ class JobQueue:
         self._save(job, item, documents.html, documents.pdf, documents.pptx)
         self._save_state(job)
 
+    def rebuild_all(self, job: Job) -> int:
+        """Refait le PDF et la fiche de tous les CV réussis d'un lot, sans LLM.
+
+        Utile après un changement d'apparence (couleurs, logo, nouveau modèle de
+        fiche) : les anciens lots prennent le nouvel habillage. Renvoie le nombre de CV refaits.
+        """
+        done = [item for item in job.items if item.status == "done"]
+        for item in done:
+            self._rebuild(job, item)
+        return len(done)
+
     # -------------------------------------------- documents pour un lot ---
     def deck(self, job: Job) -> bytes:
         """Un seul PowerPoint pour tout le lot : une diapositive par CV réussi."""

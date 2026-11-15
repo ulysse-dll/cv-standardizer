@@ -133,6 +133,7 @@
         <button id="start" class="primary big" disabled>Standardiser</button>
         <a id="zip" class="button" hidden>Tout télécharger (ZIP)</a>
         <a id="deck" class="button" hidden title="Une diapositive par candidat, dans un seul fichier">PowerPoint du lot</a>
+        <button id="rebuild-job" hidden title="Refait les PDF et les fiches avec l'apparence actuelle (couleurs, logo, modèle), sans relancer le modèle de langage">Refaire les documents</button>
         <button id="delete-job" class="danger" hidden>Supprimer ce lot</button>
       </div>
       <div id="summary" hidden></div>
@@ -279,7 +280,7 @@ startButton.addEventListener("click", async () => {
   // Nouveau lot : on repart d'une page propre.
   originals = Object.fromEntries(chosenFiles.map((file, index) => [index, file]));
   versions = {}; selected = null; tab = "result"; shownKey = null;
-  $("zip").hidden = $("deck").hidden = $("delete-job").hidden = true;
+  $("zip").hidden = $("deck").hidden = $("delete-job").hidden = $("rebuild-job").hidden = true;
   const created = await response.json();
   // On note le lot dans l'adresse de la page : si on la recharge, on le retrouve.
   history.replaceState(null, "", `?job=${created.job_id}`);
@@ -318,7 +319,7 @@ function update(newState) {
       $("zip").hidden = $("deck").hidden = false;
     }
     if ($("delete-job").hidden) loadHistory();  // le lot vient de finir : il entre dans l'historique
-    $("delete-job").hidden = false;
+    $("delete-job").hidden = $("rebuild-job").hidden = false;
   }
   // Affiche automatiquement le premier CV prêt, si aucun n'est encore choisi.
   if (selected === null) {
@@ -353,6 +354,21 @@ async function loadHistory() {
     ? `Les lots sont supprimés automatiquement après ${retentionDays} jours.`
     : "Les lots sont gardés sans limite de durée.";
 }
+
+// Après un changement de couleurs, de logo ou de modèle : on refait PDF et fiches, sans LLM.
+$("rebuild-job").addEventListener("click", async () => {
+  if (!job) return;
+  $("rebuild-job").disabled = true;
+  $("rebuild-job").textContent = "Documents en cours…";
+  const response = await fetch(`/api/batch/${job.job_id}/rebuild`, { method: "POST" });
+  $("rebuild-job").disabled = false;
+  $("rebuild-job").textContent = "Refaire les documents";
+  if (!response.ok) { alert("Les documents n'ont pas pu être refaits."); return; }
+  job = await response.json();
+  for (const item of job.items) versions[item.index] = (versions[item.index] || 0) + 1;  // recharge les aperçus
+  renderList();
+  renderPane();
+});
 
 $("delete-job").addEventListener("click", async () => {
   if (!job || !confirm("Supprimer ce lot et tous ses fichiers (PDF, PowerPoint, JSON) ? C'est définitif.")) return;

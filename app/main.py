@@ -17,6 +17,7 @@ Routes :
     DELETE .../items/{n}/photo              retire la photo
     GET  /api/batch/{job}/items/{n}/slide   l'image de la diapositive (sur Mac)
     GET  /api/batch/{job}/pptx              un seul PowerPoint pour tout le lot
+    POST /api/batch/{job}/rebuild           refait PDF et fiches du lot, sans LLM
     GET  /api/batches                       les lots précédents
     DELETE /api/batch/{job}                 supprime un lot et ses fichiers
 
@@ -238,6 +239,15 @@ def create_app(
             raise HTTPException(409, "Ce lot est encore en cours de traitement.")
         app.state.jobs.delete(job)
         return {"deleted": job_id}
+
+    @app.post("/api/batch/{job_id}/rebuild")
+    def rebuild_batch(job_id: str) -> dict:
+        """Refait les documents d'un lot terminé avec l'apparence actuelle (aucun LLM)."""
+        job = find_job(job_id)
+        if job.status != "done":
+            raise HTTPException(409, "Ce lot est encore en cours de traitement.")
+        app.state.jobs.rebuild_all(job)
+        return job_view(job)
 
     @app.get("/api/batch/{job_id}/pptx")
     def download_deck(job_id: str) -> Response:

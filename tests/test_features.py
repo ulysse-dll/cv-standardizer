@@ -247,3 +247,18 @@ def test_theme_colors_the_slide_and_the_html():
 
 def test_jobs_in_memory_constant_is_still_used():
     assert batch.MAX_JOBS_IN_MEMORY >= 1
+
+
+def test_rebuild_redraws_the_documents_without_calling_the_model(tmp_path, samples_dir):
+    provider = FakeProvider([VALID_JSON])  # une seule réponse : un second appel au LLM ferait échouer le test
+    app = create_app(provider=provider, settings=Settings(_env_file=None), outputs_dir=tmp_path)
+    with TestClient(app) as client:
+        body = _process(client, samples_dir)
+        url = f"/api/batch/{body['job_id']}"
+        slide_file = tmp_path / body["job_id"] / "01_CV_Ines_Benali.pptx"
+        slide_file.write_bytes(b"ancienne fiche")  # on abîme le fichier : il doit être refait
+        rebuilt = client.post(f"{url}/rebuild")
+        assert rebuilt.status_code == 200
+        assert rebuilt.json()["items"][0]["edited"] is False  # ce n'est pas une correction manuelle
+        assert "Inès Benali" in slide_texts(client.get(f"{url}/items/0/pptx").content)[0]
+        assert len(provider.prompts) == 1

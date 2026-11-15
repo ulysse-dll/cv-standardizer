@@ -10,8 +10,8 @@ from pptx.util import Inches
 from app.render import LABELS
 from app.schema import CV
 from app.slides import (
-    CONTENT_WIDTH, Line, estimated_height, fit_main, fit_side, initials, new_presentation, render_deck,
-    render_pptx, round_photo, slide_texts,
+    CONTENT_WIDTH, SIDE_WIDTH, Line, chips_height, estimated_height, initials, new_presentation, palette_from_theme,
+    plan_main, plan_side, render_deck, render_pptx, round_photo, slide_texts,
 )
 from app.theme import Theme
 from samples.generate_samples import _png, draw_portrait
@@ -34,9 +34,9 @@ def _pictures(pptx: bytes) -> list:
 def test_slide_contains_the_cv_content():
     pptx, notes = render_pptx(CV.model_validate(VALID_CV))
     text = _text(pptx)
-    for expected in ("Camille Lefèvre", "Développeuse back-end", "Développeuse Python — Novalys, Lyon",
-                     "03/2021 – aujourd'hui", "•  API REST", "Master Informatique", "Python · FastAPI",
-                     "Anglais — C1", "AWS Cloud Practitioner", "camille.lefevre@example.com"):
+    for expected in ("Camille Lefèvre", "Développeuse back-end", "Développeuse Python\nNovalys, Lyon",
+                     "03/2021 – aujourd'hui", "•  API REST", "Master Informatique", "Python", "FastAPI",
+                     "Anglais  C1", "AWS Cloud Practitioner", "camille.lefevre@example.com"):
         assert expected in text
     for heading in ("COORDONNÉES", "LANGUES", "FORMATION", "COMPÉTENCES", "EXPÉRIENCES PROFESSIONNELLES"):
         assert heading in text  # CV français -> rubriques en français
@@ -51,14 +51,35 @@ def test_slide_is_one_16_9_page():
     assert presentation.slide_height == Inches(7.5)
 
 
-def test_experiences_are_a_table_with_a_dates_column():
+def _shapes(pptx: bytes):
+    return list(Presentation(io.BytesIO(pptx)).slides[0].shapes)
+
+
+def test_each_skill_is_a_rounded_chip():
     pptx, _ = render_pptx(CV.model_validate(VALID_CV))
-    tables = [shape.table for shape in Presentation(io.BytesIO(pptx)).slides[0].shapes if shape.has_table]
-    main = max(tables, key=lambda table: len(table.columns))
-    assert len(main.columns) == 2
-    rows = [[cell.text_frame.text for cell in row.cells] for row in main.rows]
-    job = next(row for row in rows if row[0].startswith("03/2021"))
-    assert job[1].startswith("Développeuse Python")  # la date à gauche, le poste à droite
+    chips = [shape for shape in _shapes(pptx) if shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
+             and shape.has_text_frame and shape.text_frame.text in ("Python", "FastAPI")]
+    assert len(chips) == 2
+    assert chips[0].top == chips[1].top and chips[0].left < chips[1].left  # côte à côte, dans l'ordre
+
+
+def test_timeline_puts_dates_left_of_each_job_and_jobs_in_order():
+    cv = CV.model_validate({**VALID_CV, "experiences": VALID_CV["experiences"] + [
+        {"job_title": "Stagiaire", "company": "Mairie", "start": "2018", "end": "2019", "highlights": ["Outil interne"]}]})
+    shapes = _shapes(render_pptx(cv)[0])
+    find = lambda start: next(s for s in shapes if s.has_text_frame and s.text_frame.text.startswith(start))
+    first_dates, first_job = find("03/2021"), find("Développeuse Python")
+    second_dates, second_job = find("2018 – 2019"), find("Stagiaire")
+    assert first_dates.top == first_job.top and first_dates.left < first_job.left  # la date sur la même ligne, à gauche
+    assert second_job.top > first_job.top and second_dates.top == second_job.top  # le poste suivant en dessous
+    assert first_job.left > Inches(SIDE_WIDTH)  # dans la partie claire, pas dans la colonne sombre
+
+
+def test_contact_is_in_the_dark_side_column():
+    shapes = _shapes(render_pptx(CV.model_validate(VALID_CV))[0])
+    side = next(s for s in shapes if s.has_text_frame and "camille.lefevre@example.com" in s.text_frame.text)
+    assert side.left + side.width <= Inches(SIDE_WIDTH)
+    assert "COORDONNÉES" in side.text_frame.text and "FORMATION" in side.text_frame.text
 
 
 def test_without_photo_the_slide_shows_the_initials():
@@ -73,7 +94,7 @@ def test_with_a_photo_the_slide_contains_the_picture_in_the_top_left_corner():
     assert len(pictures) == 1
     picture = pictures[0]
     assert picture.width == picture.height  # un rond, pas un ovale
-    assert picture.left < Inches(1) and picture.top < Inches(1)  # en haut à gauche
+    assert picture.left + picture.width < Inches(SIDE_WIDTH) and picture.top < Inches(1)  # en haut de la colonne
     assert "CL" not in _text(pptx).split("\n")  # plus d'initiales : la photo les remplace
 
 
@@ -123,24 +144,33 @@ def _long_cv(jobs: int, highlights: int) -> CV:
     return CV.model_validate({"identity": {"full_name": "Jean Dupont"}, "experiences": [job] * jobs})
 
 
-def _bullets(fit) -> int:
-    return sum(line.runs[0][0].startswith("•") for line in fit.lines)
-
-
 def test_medium_cv_shrinks_the_font_but_keeps_everything():
-    fit = fit_main(_long_cv(jobs=5, highlights=4), FRENCH)
-    assert fit.size < 11.5
-    assert fit.dropped == []
-    assert _bullets(fit) == 20  # 5 postes x 4 réalisations
+    plan = plan_main(_long_cv(jobs=4, highlights=4))
+    assert plan.size < 11.5
+    assert plan.max_highlights == 4 and plan.dropped == []
 
 
 def test_very_long_cv_drops_highlights_and_says_so():
     cv = _long_cv(jobs=9, highlights=6)
     pptx, notes = render_pptx(cv)
-    assert len(notes) == 1 and "réalisations limitées" in notes[0]
+    assert any("réalisations limitées" in note for note in notes)
     text = _text(pptx)
     assert text.count("Responsable de projets informatiques") == 9  # tous les postes restent
     assert text.count("•") < 9 * 6
+
+
+def test_skills_are_reduced_before_the_last_highlights():
+    cv = CV.model_validate({
+        "identity": {"full_name": "Jean Dupont"},
+        "skills": [f"Compétence numéro {n}" for n in range(14)],
+        "experiences": [{"job_title": f"Poste {n}", "company": "Société", "start": "2020", "end": "2021",
+                         "highlights": ["Une réalisation assez longue pour occuper une ligne entière de la fiche."] * 3}
+                        for n in range(6)],
+    })
+    plan = plan_main(cv)
+    assert plan.max_highlights >= 1  # on garde au moins une réalisation par poste...
+    assert plan.max_skills < 14  # ...quitte à montrer moins de compétences
+    assert any("compétences limitées" in note for note in plan.dropped)
 
 
 def test_side_column_gives_up_the_interests_when_it_is_too_long():
@@ -151,9 +181,16 @@ def test_side_column_gives_up_the_interests_when_it_is_too_long():
         "certifications": [{"name": f"Certification professionnelle numéro {n}", "issuer": "Organisme", "date": "2020"} for n in range(5)],
         "interests": ["Cyclisme", "Photographie"],
     })
-    fit = fit_side(cv, FRENCH)
-    assert fit.size < 10
-    assert any("centres d'intérêt" in note or "trop longue" in note for note in fit.dropped)
+    plan = plan_side(cv, FRENCH, palette_from_theme(Theme()))
+    assert plan.size < 10.5
+    assert any("centres d'intérêt" in note or "trop longue" in note for note in plan.dropped)
+
+
+def test_chips_wrap_on_several_rows():
+    one_row = chips_height(["SQL", "Git"], 10, 8)
+    three_rows = chips_height(["Une compétence au nom très long"] * 6, 10, 8)
+    assert three_rows > 2 * one_row
+    assert chips_height([], 10, 8) == 0
 
 
 def test_estimated_height_grows_with_text_and_font_size():
@@ -163,11 +200,9 @@ def test_estimated_height_grows_with_text_and_font_size():
     assert estimated_height(long, 12, CONTENT_WIDTH) > estimated_height(long, 9, CONTENT_WIDTH)
 
 
-def test_a_short_skill_is_never_cut_in_two():
-    cv = CV.model_validate({"identity": {"full_name": "Léa Marchand"}, "skills": ["Figma", "tests utilisateurs"]})
-    raw = Presentation(io.BytesIO(render_pptx(cv)[0])).slides[0]
-    cells = [cell.text_frame.text for shape in raw.shapes if shape.has_table for row in shape.table.rows for cell in row.cells]
-    assert any("tests\u00a0utilisateurs" in cell for cell in cells)  # espace insécable entre les deux mots
+def test_theme_accent_gives_a_darker_side_column_and_a_pale_chip():
+    palette = palette_from_theme(Theme(accent="#1F4E79"))
+    assert sum(palette.side) < sum(palette.accent) < sum(palette.chip)  # sombre < couleur < très clair
 
 
 # ------------------------------------------------ lot et pied de page -----

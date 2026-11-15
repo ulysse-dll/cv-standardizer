@@ -16,13 +16,12 @@ Chaque CV ressort en trois fichiers : un **PDF** d'une page A4, une
 **diapositive PowerPoint** (`.pptx`, une seule diapo 16:9, modifiable) et un
 **JSON**.
 
-La diapositive est une **fiche profil** au format des documents
-d'entreprise, toujours la même : en haut à gauche la **photo du candidat**
-(retrouvée dans son CV ; à défaut, un rond avec ses initiales), son nom et
-son titre ; à gauche une colonne grise (coordonnées, langues, formation,
-certifications) ; à droite le profil, les compétences et les expériences en
-tableau, dates alignées dans leur colonne ; en bas un pied de page
-« Profil candidat · Confidentiel ».
+La diapositive est une **fiche profil**, toujours la même : à gauche une
+colonne sombre avec la **photo du candidat** en grand (retrouvée dans son
+CV ; à défaut, un rond avec ses initiales), ses coordonnées, ses langues, sa
+formation et ses certifications ; à droite son nom, son profil, ses
+compétences en pastilles et ses expériences en frise chronologique ; en bas
+un pied de page « Profil candidat · Confidentiel ».
 
 Après le passage du modèle, tu peux **corriger le résultat à la main** dans
 la page : le PDF et la diapositive sont refaits aussitôt, sans relancer le LLM.
@@ -188,23 +187,28 @@ ses fichiers. Les lots de plus de 30 jours sont supprimés automatiquement
 
 ### Couleurs, logo, pied de page
 
-Dans `.env` : `THEME_ACCENT` (couleur principale du PDF et de la
-diapositive), `THEME_STRIPE` (le liseré sous la barre du haut),
+Dans `.env` : `THEME_ACCENT` (couleur principale : la colonne sombre de la
+fiche en est la version assombrie, les pastilles la version éclaircie),
+`THEME_STRIPE` (la seconde couleur : liseré et petits traits),
 `THEME_LOGO_PATH` (un logo en haut à droite de la diapositive) et
 `THEME_FOOTER` (le texte du pied de page). Redémarre le serveur ensuite.
+
+Pour appliquer la nouvelle apparence à un lot déjà traité, ouvre-le et
+clique sur « Refaire les documents » : les PDF et les fiches sont
+régénérés en quelques secondes, sans relancer le modèle de langage.
 
 ### Le modèle PowerPoint de ton entreprise
 
 Si ton entreprise a son propre modèle `.pptx` (fond, logo, pied de page,
 mentions légales), indique son chemin dans `THEME_TEMPLATE_PATH`. La fiche
 est alors dessinée sur la mise en page la plus vide du modèle, à sa taille
-(16:9 ou 4:3), et notre barre de couleur, notre logo et notre pied de page
-disparaissent au profit de ceux du modèle.
+(16:9 ou 4:3), et notre logo et notre pied de page disparaissent au profit
+de ceux du modèle.
 
-La fiche occupe toujours la même zone : le titre en haut, le contenu entre
-22 % et 90 % de la hauteur. Si le modèle a un grand bandeau ou un pied de
-page épais, le texte peut les recouvrir. Cette fonction a été essayée avec
-un modèle fabriqué pour le test, pas avec un vrai modèle d'entreprise.
+La fiche occupe toute la diapositive : la colonne sombre recouvre le tiers
+gauche du modèle, et le contenu peut passer sur un bandeau ou un pied de
+page épais. Cette fonction a été essayée avec un modèle fabriqué pour le
+test, pas avec un vrai modèle d'entreprise.
 
 Ollama doit tourner (l'application Ollama ouverte, ou `ollama serve`).
 
@@ -475,9 +479,10 @@ Intel (une à deux minutes par CV).
 - L'export PDF par le navigateur prend de 1 à 6 secondes selon les moments,
   sans cause identifiée.
 - La diapositive n'a qu'une page. Pour un CV long, la police est réduite
-  (jusqu'à 9 points), puis le nombre de réalisations par poste (un
-  avertissement « Diapositive » le signale). La place prise par le texte est
-  estimée, pas mesurée : sur un CV extrême, le texte peut déborder.
+  (jusqu'à 8,5 points), puis le nombre de réalisations par poste et de
+  compétences ; un avertissement « Diapositive » le signale. La place prise
+  par le texte est estimée, pas mesurée : sur un CV extrême, des blocs
+  peuvent se chevaucher ou déborder.
 - La diapositive a été contrôlée avec l'aperçu de macOS (Quick Look), pas
   dans PowerPoint ni Keynote, absents de la machine de développement.
 - L'aperçu de la diapositive dans la page n'existe que sur Mac (il vient de
