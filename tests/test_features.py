@@ -19,7 +19,7 @@ from app.config import Settings
 from app.main import create_app
 from app.render import render_html
 from app.schema import CV
-from app.slides import render_deck, render_pptx
+from app.slides import render_deck, render_pptx, slide_texts
 from app.theme import Theme, hex_to_rgb, theme_from_settings
 from samples.generate_samples import _png, draw_logo, draw_portrait
 from tests.test_pipeline import VALID_JSON, FakeProvider
@@ -43,11 +43,7 @@ def _process(client, samples_dir, filename="cv_tableaux_fr.docx", **form):
     return response.json()
 
 
-def _slide_texts(pptx: bytes):
-    return [
-        "\n".join(shape.text_frame.text for shape in slide.shapes if shape.has_text_frame)
-        for slide in Presentation(io.BytesIO(pptx)).slides
-    ]
+_slide_texts = slide_texts  # relit zones de texte et tableaux
 
 
 # ------------------------------------------------------------ anonymat ---

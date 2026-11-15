@@ -34,11 +34,13 @@ LABELS = {
         "summary": "Profil", "experiences": "Expériences professionnelles", "education": "Formation",
         "skills": "Compétences", "languages": "Langues", "certifications": "Certifications",
         "interests": "Centres d'intérêt", "present": "aujourd'hui",
+        "contact": "Coordonnées", "footer": "Profil candidat · Confidentiel",
     },
     "en": {
         "summary": "Profile", "experiences": "Experience", "education": "Education",
         "skills": "Skills", "languages": "Languages", "certifications": "Certifications",
         "interests": "Interests", "present": "present",
+        "contact": "Contact", "footer": "Candidate profile · Confidential",
     },
 }
 _FRENCH_WORDS = {"le", "la", "les", "des", "du", "et", "de", "en", "pour", "avec", "dans", "sur", "un", "une"}

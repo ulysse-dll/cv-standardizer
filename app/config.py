@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     theme_accent: str = "#1F4E79"
     theme_stripe: str = "#E8A33D"
     theme_logo_path: str = ""
+    theme_footer: str = ""  # texte du pied de page de la diapositive (vide = « Profil candidat · Confidentiel »)
+    theme_template_path: str = ""  # un modèle .pptx d'entreprise, à la place de notre habillage
 
     # Les lots plus vieux que ce nombre de jours sont supprimés (0 = jamais).
     output_retention_days: int = 30
