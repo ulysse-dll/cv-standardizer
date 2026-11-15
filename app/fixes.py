@@ -4,7 +4,8 @@ Quand une information est écrite noir sur blanc dans le CV, mieux vaut la
 retrouver avec une règle simple que compter sur le modèle : c'est gratuit,
 instantané, et ça donne toujours le même résultat.
 
-Deux corrections : le poste en cours, et les coordonnées (e-mail, téléphone).
+Quatre corrections : l'intitulé de poste qui a avalé l'entreprise, le poste en
+cours, les coordonnées (e-mail, téléphone), et les faux centres d'intérêt.
 """
 
 import difflib
@@ -109,6 +110,66 @@ def fix_contact(cv: CV, source_text: str) -> CV:
     return cv
 
 
+# ------------------------------------------- intitulé + entreprise --------
+# Les séparateurs qu'on trouve entre un poste et son entreprise : « — », « – », « | ».
+# (Pas le simple tiret : « Responsable marketing - communication » est un seul intitulé.)
+_TITLE_SEPARATOR = re.compile(r"\s+[—–|]\s+")
+
+
+def split_job_titles(cv: CV) -> CV:
+    """« Directeur de site — Translog Centre, Saran » -> poste, entreprise et lieu séparés.
+
+    Sur un CV long, le modèle recopie parfois toute la ligne dans l'intitulé
+    du poste (vu avec gemma3:4b). Deux cas :
+    - l'entreprise est vide : on la reprend dans ce qui suit le séparateur ;
+    - l'entreprise est déjà remplie et se retrouve après le séparateur : la
+      fin de l'intitulé faisait doublon, on la retire.
+    """
+    for job in cv.experiences:
+        parts = _TITLE_SEPARATOR.split(job.job_title, maxsplit=1)
+        if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+            continue
+        head, tail = parts[0].strip(), parts[1].strip()
+        if job.company is None:
+            company, comma, place = tail.rpartition(", ")
+            job.job_title = head
+            job.company = company if comma else tail
+            if comma and job.location is None:
+                job.location = place
+        elif normalize(job.company) in normalize(tail):
+            job.job_title = head
+    return cv
+
+
+# ----------------------------------------------- centres d'intérêt --------
+_INTERESTS_HEADING = re.compile(
+    r"int[ée]r[êe]ts?|loisirs|hobbies|interests|passions?|activit[ée]s? (?:extra|personnelles?)|leisure", re.IGNORECASE
+)
+
+
+def clean_interests(cv: CV, source_text: str) -> CV:
+    """Retire les faux centres d'intérêt.
+
+    Depuis que le CV a une rubrique « centres d'intérêt », le modèle y range
+    parfois ce qu'il ne sait pas placer (vu : une certification et sa date).
+    Si le CV d'origine n'a aucune rubrique de ce genre, la liste est vidée.
+    Dans tous les cas, on retire une année seule et ce qui figure déjà dans
+    les compétences ou les certifications.
+    """
+    if not _INTERESTS_HEADING.search(source_text):
+        cv.interests = []
+        return cv
+    elsewhere = {normalize(skill) for skill in cv.skills} | {normalize(item.name) for item in cv.certifications}
+    cv.interests = [
+        interest for interest in cv.interests
+        if not re.fullmatch(r"\d{4}", interest.strip()) and normalize(interest) not in elsewhere
+    ]
+    return cv
+
+
 def apply_fixes(cv: CV, source_text: str) -> CV:
     """Toutes les corrections de ce fichier, dans l'ordre."""
-    return fix_contact(fill_current_jobs(cv, source_text), source_text)
+    cv = split_job_titles(cv)  # d'abord : le poste en cours se cherche par l'intitulé
+    cv = fill_current_jobs(cv, source_text)
+    cv = fix_contact(cv, source_text)
+    return clean_interests(cv, source_text)

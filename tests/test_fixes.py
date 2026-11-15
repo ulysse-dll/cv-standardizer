@@ -92,3 +92,42 @@ def test_with_several_emails_only_a_close_one_is_used():
     assert fix_contact(_person(email="jean.dupond@example.com"), source).identity.email == "jean.dupont@example.com"
     # Rien de ressemblant : on ne choisit pas au hasard entre les deux.
     assert fix_contact(_person(), source).identity.email is None
+
+
+# ------------------------------------------- intitulé + entreprise --------
+from app.fixes import clean_interests, split_job_titles  # noqa: E402
+
+
+def test_title_that_swallowed_the_company_is_split():
+    cv = split_job_titles(_cv({"job_title": "Directeur de site — Translog Centre, Saran"}))  # vu avec gemma3:4b
+    job = cv.experiences[0]
+    assert (job.job_title, job.company, job.location) == ("Directeur de site", "Translog Centre", "Saran")
+
+
+def test_title_that_repeats_the_company_is_shortened():
+    cv = split_job_titles(_cv({"job_title": "Chef de produit | Maison Lestrade (Lille)", "company": "Maison Lestrade", "location": "Lille"}))
+    job = cv.experiences[0]
+    assert (job.job_title, job.company, job.location) == ("Chef de produit", "Maison Lestrade", "Lille")
+
+
+def test_legitimate_titles_are_left_alone():
+    # Un simple tiret, ou un séparateur suivi d'autre chose que l'entreprise connue.
+    for title, company in [("Responsable marketing - communication", None), ("Directeur — Europe du Sud", "Novalys")]:
+        cv = split_job_titles(_cv({"job_title": title, "company": company}))
+        assert (cv.experiences[0].job_title, cv.experiences[0].company) == (title, company)
+
+
+# ----------------------------------------------- centres d'intérêt --------
+def _with_interests(*interests, **extra) -> CV:
+    return CV.model_validate({"identity": {"full_name": "Jean Dupont"}, "interests": list(interests), **extra})
+
+
+def test_interests_are_emptied_when_the_cv_has_no_such_section():
+    source = "Certifications\nCACES R489 catégories 1, 3 et 5, 2003"
+    assert clean_interests(_with_interests("CACES R489 catégories 1, 3 et 5", "2003"), source).interests == []
+
+
+def test_real_interests_are_kept_but_years_and_duplicates_are_removed():
+    source = "Centres d'intérêt\nCyclisme sur route\nPhotographie argentique"
+    cv = _with_interests("Cyclisme sur route", "2003", "Figma", "Photographie argentique", skills=["Figma"])
+    assert clean_interests(cv, source).interests == ["Cyclisme sur route", "Photographie argentique"]

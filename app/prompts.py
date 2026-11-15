@@ -22,7 +22,8 @@ Rules:
 - Dates: "MM/YYYY" or "YYYY".
 - highlights: only the bullet points written under that job, copied as they are. Never add one, never repeat one. A job with one bullet point gets one highlight.
 - skills: short keywords only.
-- interests: hobbies and personal interests listed in the CV.
+- interests: hobbies only, taken from a section named like Interests, Hobbies, Centres d'intérêt or Loisirs. No such section: [].
+- job_title: the job name only. The employer goes in company, the city in location.
 - Output minified JSON on one line."""
 
 
