@@ -94,5 +94,5 @@ def test_interests_are_shown_in_the_cv_and_on_the_slide():
     html = render_html(cv)
     assert "Centres d&#39;intérêt" in html and "Cyclisme sur route · Photographie argentique" in html
     slide = Presentation(io.BytesIO(render_pptx(cv)[0])).slides[0]
-    text = "\n".join(shape.text_frame.text for shape in slide.shapes if shape.has_text_frame).replace(" ", " ")
+    text = "\n".join(shape.text_frame.text for shape in slide.shapes if shape.has_text_frame).replace("\u00a0", " ")
     assert "CENTRES D'INTÉRÊT" in text and "Photographie argentique" in text
