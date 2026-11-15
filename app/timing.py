@@ -12,6 +12,7 @@ Chaque étape est aussi écrite dans les logs (console + logs/cv_agent.log).
 
 import logging
 import time
+from logging.handlers import RotatingFileHandler
 from contextlib import contextmanager
 from typing import Dict
 
@@ -25,10 +26,12 @@ def setup_logging() -> None:
     if logger.handlers:  # déjà configuré
         return
     LOGS_DIR.mkdir(exist_ok=True)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%H:%M:%S")
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S")
     for handler in (
         logging.StreamHandler(),
-        logging.FileHandler(LOGS_DIR / "cv_agent.log", encoding="utf-8"),
+        # Fichier "tournant" : au-delà de 1 Mo, il est renommé cv_agent.log.1 et on
+        # repart d'un fichier vide. On garde 3 anciens fichiers, jamais plus.
+        RotatingFileHandler(LOGS_DIR / "cv_agent.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"),
     ):
         handler.setFormatter(formatter)
         logger.addHandler(handler)

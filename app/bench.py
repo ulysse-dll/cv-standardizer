@@ -9,6 +9,7 @@ Affiche, pour chaque CV, la durée de chaque étape en secondes.
 import sys
 from pathlib import Path
 
+from app.batch import keep_awake
 from app.config import ROOT_DIR, get_settings
 from app.llm import get_provider
 from app.pipeline import process_cv
@@ -26,13 +27,14 @@ def main() -> None:
     )
 
     rows = []
-    for path in paths:
-        try:
-            result = process_cv(path.read_bytes(), path.name, provider, settings)
-            cells = [f"{result.timings.get(step, 0):.1f}" for step in STEPS]
-            rows.append([path.name, *cells, f"{sum(result.timings.values()):.1f}", str(result.attempts)])
-        except Exception as error:  # on continue avec les autres fichiers
-            rows.append([path.name, *["-"] * len(STEPS), "-", f"ÉCHEC : {error}"])
+    with keep_awake():  # la mesure dure des minutes : le Mac ne doit pas s'endormir au milieu
+        for path in paths:
+            try:
+                result = process_cv(path.read_bytes(), path.name, provider, settings)
+                cells = [f"{result.timings.get(step, 0):.1f}" for step in STEPS]
+                rows.append([path.name, *cells, f"{sum(result.timings.values()):.1f}", str(result.attempts)])
+            except Exception as error:  # on continue avec les autres fichiers
+                rows.append([path.name, *["-"] * len(STEPS), "-", f"ÉCHEC : {error}"])
 
     header = ["fichier", *STEPS, "total", "essais"]
     widths = [max(len(row[i]) for row in [header, *rows]) for i in range(len(header))]

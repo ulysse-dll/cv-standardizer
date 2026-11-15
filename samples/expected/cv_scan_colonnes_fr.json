@@ -1,0 +1,81 @@
+{
+  "identity": {
+    "full_name": "Nadia Haddad",
+    "email": "nadia.haddad@example.org",
+    "phone": "01 82 83 84 85",
+    "location": "Marseille",
+    "links": []
+  },
+  "title": "Infirmière coordinatrice",
+  "summary": "Infirmière diplômée d'État depuis douze ans, coordinatrice en EHPAD depuis 2020.",
+  "experiences": [
+    {
+      "job_title": "Infirmière coordinatrice",
+      "company": "Résidence Les Oliviers",
+      "location": "Marseille",
+      "start": "04/2020",
+      "end": "present",
+      "highlights": [
+        "Coordination d'une équipe de 28 soignants pour 92 résidents.",
+        "Élaboration des plannings et des projets de soins personnalisés.",
+        "Référente pour la prévention des chutes."
+      ]
+    },
+    {
+      "job_title": "Infirmière en cardiologie",
+      "company": "Hôpital Saint-Lazare",
+      "location": "Aix-en-Provence",
+      "start": "09/2013",
+      "end": "03/2020",
+      "highlights": [
+        "Soins en unité de soins intensifs cardiologiques, 12 lits.",
+        "Encadrement des étudiants infirmiers de troisième année."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Diplôme universitaire Coordination en gérontologie",
+      "school": "Aix-Marseille Université",
+      "location": null,
+      "start": null,
+      "end": "2019"
+    },
+    {
+      "degree": "Diplôme d'État d'infirmier",
+      "school": "IFSI de Marseille",
+      "location": null,
+      "start": null,
+      "end": "2013"
+    }
+  ],
+  "skills": [
+    "Coordination des soins",
+    "Gérontologie",
+    "Soins intensifs",
+    "Éducation thérapeutique",
+    "Logiciel NetSoins",
+    "Gestion des plannings"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Arabe",
+      "level": "courant"
+    },
+    {
+      "name": "Anglais",
+      "level": "scolaire"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "AFGSU niveau 2",
+      "issuer": null,
+      "date": "2022"
+    }
+  ]
+}

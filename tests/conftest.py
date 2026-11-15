@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from app import render
+from app import render, timing
 from samples.generate_samples import SAMPLES, SAMPLES_DIR
+from samples.hard_samples import HARD_SAMPLES
 
 
 @pytest.fixture(autouse=True)
@@ -17,10 +18,17 @@ def skip_slow_pdf(request, monkeypatch):
         monkeypatch.setattr(render, "pdf_engine", lambda: None)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def logs_in_a_temporary_folder(tmp_path_factory):
+    """Les tests écrivent leurs journaux dans un dossier jetable, pas dans logs/ :
+    sinon le vrai journal se remplit de faux échecs voulus par les tests."""
+    timing.LOGS_DIR = tmp_path_factory.mktemp("logs")
+
+
 @pytest.fixture(scope="session")
 def samples_dir() -> Path:
     """Le dossier des faux CV. On régénère ceux qui manqueraient."""
-    for filename, make in SAMPLES.items():
+    for filename, make in {**SAMPLES, **HARD_SAMPLES}.items():
         if not (SAMPLES_DIR / filename).exists():
             make(SAMPLES_DIR / filename)
     return SAMPLES_DIR

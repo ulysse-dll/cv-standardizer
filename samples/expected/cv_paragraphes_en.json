@@ -1,0 +1,93 @@
+{
+  "identity": {
+    "full_name": "Priya Raman",
+    "email": "priya.raman@example.co.uk",
+    "phone": "+44 161 496 0199",
+    "location": "Bristol, UK",
+    "links": []
+  },
+  "title": "Product Manager",
+  "summary": "Product manager with eight years in B2B software. I like small teams, short release cycles and decisions backed by customer interviews.",
+  "experiences": [
+    {
+      "job_title": "Senior Product Manager",
+      "company": "Harbourline Software",
+      "location": "Bristol",
+      "start": "2021",
+      "end": "present",
+      "highlights": [
+        "I own the roadmap of the invoicing product used by 3,000 small businesses.",
+        "Last year we rebuilt the onboarding flow and cut churn in the first month by a third.",
+        "I manage two product owners and work daily with a team of twelve engineers."
+      ]
+    },
+    {
+      "job_title": "Product Manager",
+      "company": "Kestrel Analytics",
+      "location": "London",
+      "start": "2018",
+      "end": "2021",
+      "highlights": [
+        "I launched the self-service reporting module from the first prototype to general availability.",
+        "The module reached 40% of customers within a year."
+      ]
+    },
+    {
+      "job_title": "Business Analyst",
+      "company": "Northgate Insurance",
+      "location": "Leeds",
+      "start": "2016",
+      "end": "2018",
+      "highlights": [
+        "I wrote the specifications for the claims handling portal.",
+        "I also ran user acceptance testing with the call centre teams."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "MSc Human-Computer Interaction",
+      "school": "University of York",
+      "location": null,
+      "start": "2015",
+      "end": "2016"
+    },
+    {
+      "degree": "BA Economics",
+      "school": "University of Warwick",
+      "location": null,
+      "start": "2012",
+      "end": "2015"
+    }
+  ],
+  "skills": [
+    "Roadmapping",
+    "User interviews",
+    "A/B testing",
+    "SQL",
+    "Jira",
+    "Figma",
+    "Scrum"
+  ],
+  "languages": [
+    {
+      "name": "English",
+      "level": "native"
+    },
+    {
+      "name": "Tamil",
+      "level": "fluent"
+    },
+    {
+      "name": "Spanish",
+      "level": "basic"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Certified Scrum Product Owner",
+      "issuer": "Scrum Alliance",
+      "date": "2019"
+    }
+  ]
+}

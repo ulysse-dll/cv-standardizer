@@ -54,7 +54,7 @@ def test_wrong_end_date_is_half_the_dates_score():
 
 def test_every_sample_has_an_expected_answer_that_is_a_valid_cv(samples_dir):
     samples = [path for path in samples_dir.iterdir() if path.suffix in (".pdf", ".docx")]
-    assert len(samples) == 5
+    assert len(samples) == 9  # 5 faciles + 4 difficiles
     for path in samples:
         CV.model_validate_json((EXPECTED_DIR / f"{path.stem}.json").read_text(encoding="utf-8"))
 

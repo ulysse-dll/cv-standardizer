@@ -380,7 +380,9 @@ SAMPLES = {
 
 
 def generate_all(target_dir: Path = SAMPLES_DIR) -> None:
-    for filename, make in SAMPLES.items():
+    from samples.hard_samples import HARD_SAMPLES  # import ici : hard_samples importe ce fichier
+
+    for filename, make in {**SAMPLES, **HARD_SAMPLES}.items():
         make(target_dir / filename)
         print("créé :", target_dir / filename)
 

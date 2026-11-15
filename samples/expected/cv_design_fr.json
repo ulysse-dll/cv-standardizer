@@ -1,0 +1,88 @@
+{
+  "identity": {
+    "full_name": "Hugo Fontaine",
+    "email": "hugo.fontaine@example.com",
+    "phone": "01 70 60 50 40",
+    "location": "Lille",
+    "links": [
+      "hugofontaine.example"
+    ]
+  },
+  "title": "Chef de produit e-commerce",
+  "summary": "Chef de produit e-commerce depuis sept ans, passé par le retail et une start-up. J'aime mesurer avant de décider et livrer petit à petit.",
+  "experiences": [
+    {
+      "job_title": "Chef de produit e-commerce",
+      "company": "Maison Lestrade",
+      "location": "Lille",
+      "start": "01/2021",
+      "end": "present",
+      "highlights": [
+        "Refonte du tunnel de commande : +12 % de conversion sur mobile.",
+        "Lancement du retrait en magasin dans 45 boutiques.",
+        "Priorisation du backlog avec une équipe de 9 développeurs."
+      ]
+    },
+    {
+      "job_title": "Chef de projet digital",
+      "company": "Bobine",
+      "location": "Roubaix",
+      "start": "03/2019",
+      "end": "12/2020",
+      "highlights": [
+        "Création de la place de marché de tissus entre particuliers.",
+        "Croissance de 0 à 20 000 clients en dix-huit mois."
+      ]
+    },
+    {
+      "job_title": "Assistant chef de produit",
+      "company": "Nordis",
+      "location": "Villeneuve-d'Ascq",
+      "start": "09/2016",
+      "end": "02/2019",
+      "highlights": [
+        "Suivi des ventes de la gamme jardin, 1 200 références."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master Marketing et vente",
+      "school": "IAE Lille",
+      "location": null,
+      "start": "2014",
+      "end": "2016"
+    },
+    {
+      "degree": "Licence Économie et gestion",
+      "school": "Université de Lille",
+      "location": null,
+      "start": "2011",
+      "end": "2014"
+    }
+  ],
+  "skills": [
+    "Shopify",
+    "Google Analytics 4",
+    "SQL",
+    "Tests A/B",
+    "SEO",
+    "Figma",
+    "Jira"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Anglais",
+      "level": "courant"
+    },
+    {
+      "name": "Néerlandais",
+      "level": "débutant"
+    }
+  ],
+  "certifications": []
+}

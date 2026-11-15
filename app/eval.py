@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+from app.batch import keep_awake
 from app.config import ROOT_DIR, Settings, get_settings
 from app.coverage import find_missing_lines, find_unsupported_values, normalize
 from app.extraction import extract_text
@@ -158,10 +159,11 @@ def main() -> None:
         path for path in SAMPLES_DIR.iterdir() if (EXPECTED_DIR / f"{path.stem}.json").exists() and path.suffix != ".json"
     )
     rows = []
-    for path in paths:
-        row = evaluate_file(path, provider, settings)
-        rows.append(row)
-        print(f"{row.filename} : {row.total:.0f}/100 en {row.seconds:.0f} s" + (f" (ÉCHEC : {row.error})" if row.error else ""), flush=True)
+    with keep_awake():  # le banc d'essai dure des minutes : le Mac ne doit pas s'endormir au milieu
+        for path in paths:
+            row = evaluate_file(path, provider, settings)
+            rows.append(row)
+            print(f"{row.filename} : {row.total:.0f}/100 en {row.seconds:.0f} s" + (f" (ÉCHEC : {row.error})" if row.error else ""), flush=True)
 
     print(f"\nModèle : {provider.model} ({provider.name}) — notes sur 100")
     print(format_table(rows))

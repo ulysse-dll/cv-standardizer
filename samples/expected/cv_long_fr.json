@@ -1,0 +1,164 @@
+{
+  "identity": {
+    "full_name": "Bernard Rousseau",
+    "email": "bernard.rousseau@example.fr",
+    "phone": "01 60 70 80 90",
+    "location": "Orléans (45)",
+    "links": [
+      "linkedin.com/in/bernard-rousseau-faux"
+    ]
+  },
+  "title": "Directeur des opérations logistiques",
+  "summary": "Vingt-cinq ans d'expérience en logistique et transport, dont douze à la direction de sites. Spécialiste de la mise en service d'entrepôts automatisés et de la réduction des coûts de distribution. Manager de terrain, habitué aux négociations avec les partenaires sociaux.",
+  "experiences": [
+    {
+      "job_title": "Directeur des opérations",
+      "company": "Translog Centre",
+      "location": "Orléans",
+      "start": "01/2019",
+      "end": "present",
+      "highlights": [
+        "Pilotage de 4 entrepôts et de 620 collaborateurs, budget annuel de 48 M€.",
+        "Mise en service d'un entrepôt automatisé de 32 000 m² en 14 mois.",
+        "Baisse de 11 % du coût par colis expédié en trois ans.",
+        "Négociation de l'accord d'entreprise sur le travail de nuit."
+      ]
+    },
+    {
+      "job_title": "Directeur de site",
+      "company": "Translog Centre",
+      "location": "Saran",
+      "start": "03/2014",
+      "end": "12/2018",
+      "highlights": [
+        "Direction d'une plateforme de 210 personnes fonctionnant en 3x8.",
+        "Taux de service client porté de 94 % à 98,5 %.",
+        "Déploiement du système de gestion d'entrepôt Reflex."
+      ]
+    },
+    {
+      "job_title": "Responsable d'exploitation",
+      "company": "Frigo Express",
+      "location": "Tours",
+      "start": "09/2009",
+      "end": "02/2014",
+      "highlights": [
+        "Organisation des tournées de 85 véhicules frigorifiques.",
+        "Réduction de 18 % des kilomètres parcourus à vide.",
+        "Recrutement et formation de 40 conducteurs."
+      ]
+    },
+    {
+      "job_title": "Responsable méthodes logistiques",
+      "company": "Groupe Valmont Distribution",
+      "location": "Chartres",
+      "start": "06/2005",
+      "end": "08/2009",
+      "highlights": [
+        "Refonte de l'implantation des stocks de trois entrepôts.",
+        "Gain de 22 % de productivité en préparation de commandes.",
+        "Animation de chantiers d'amélioration continue (Kaizen)."
+      ]
+    },
+    {
+      "job_title": "Chef d'équipe réception",
+      "company": "Groupe Valmont Distribution",
+      "location": "Chartres",
+      "start": "01/2002",
+      "end": "05/2005",
+      "highlights": [
+        "Encadrement de 25 caristes et agents de quai.",
+        "Mise en place du contrôle qualité à la réception."
+      ]
+    },
+    {
+      "job_title": "Agent de planning transport",
+      "company": "Messageries du Val de Loire",
+      "location": "Blois",
+      "start": "09/1999",
+      "end": "12/2001",
+      "highlights": [
+        "Planification quotidienne de 60 tournées de messagerie.",
+        "Suivi des litiges et des retours clients."
+      ]
+    },
+    {
+      "job_title": "Stagiaire logistique",
+      "company": "Usine Renard Emballages",
+      "location": "Vendôme",
+      "start": "02/1999",
+      "end": "07/1999",
+      "highlights": [
+        "Étude des flux internes de l'atelier de conditionnement."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Executive MBA",
+      "school": "ESCP Business School",
+      "location": "Paris",
+      "start": "2012",
+      "end": "2013"
+    },
+    {
+      "degree": "Master Logistique et transport",
+      "school": "Université d'Orléans",
+      "location": null,
+      "start": "1997",
+      "end": "1999"
+    },
+    {
+      "degree": "Licence Sciences économiques",
+      "school": "Université de Tours",
+      "location": null,
+      "start": "1994",
+      "end": "1997"
+    }
+  ],
+  "skills": [
+    "Direction de site",
+    "Gestion d'entrepôt (WMS Reflex)",
+    "Transport routier",
+    "Chaîne du froid",
+    "Lean management",
+    "Kaizen",
+    "Budget et contrôle de gestion",
+    "Négociation sociale",
+    "SAP",
+    "Excel avancé",
+    "Sécurité et prévention",
+    "Conduite du changement"
+  ],
+  "languages": [
+    {
+      "name": "Français",
+      "level": "langue maternelle"
+    },
+    {
+      "name": "Anglais",
+      "level": "professionnel"
+    },
+    {
+      "name": "Allemand",
+      "level": "notions"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Green Belt Lean Six Sigma",
+      "issuer": "AFNOR",
+      "date": "2016"
+    },
+    {
+      "name": "Attestation de capacité de transport de marchandises",
+      "issuer": null,
+      "date": "2010"
+    },
+    {
+      "name": "CACES R489 catégories 1, 3 et 5",
+      "issuer": null,
+      "date": "2003"
+    }
+  ]
+}
