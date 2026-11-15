@@ -33,10 +33,11 @@ Deux choses à faire, une seule fois.
 **1. Installe Ollama** : <https://ollama.com/download> (c'est lui qui fait
 tourner le modèle de langage).
 
-**2. Lance le script d'installation** :
+**2. Récupère le projet et lance le script d'installation** :
 
 ```sh
-cd ~/cv-standardizer
+git clone https://github.com/ulysse-dll/cv-standardizer.git
+cd cv-standardizer
 ./install.sh
 ```
 
@@ -432,7 +433,7 @@ faut un accès protégé devant l'application (VPN, ou reverse proxy en HTTPS).
 ### Sur un autre Mac
 
 ```sh
-git clone <adresse du dépôt> cv-standardizer   # ou copie du dossier, sans .venv/ ni outputs/
+git clone https://github.com/ulysse-dll/cv-standardizer.git
 cd cv-standardizer
 ./install.sh
 ./run.sh
@@ -502,3 +503,11 @@ Intel (une à deux minutes par CV).
   fichier, ce qui convient le plus souvent mais pas toujours.
 - Les jobs sont gardés en mémoire : ils disparaissent au redémarrage du
   serveur (les fichiers dans `outputs/` restent).
+
+## 11. Licence
+
+Licence MIT : tu peux réutiliser et modifier ce code librement, en gardant
+la mention de l'auteur. Voir le fichier `LICENSE`.
+
+Les CV du dossier `samples/` sont inventés de toutes pièces (personnes,
+entreprises, coordonnées) ; le portrait est un dessin.
