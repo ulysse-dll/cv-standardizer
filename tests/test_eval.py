@@ -4,7 +4,7 @@ import copy
 
 from app.config import Settings
 from app.coverage import normalize
-from app.eval import CRITERIA, EXPECTED_DIR, evaluate_file, format_table, overlap, score_cv
+from app.eval import CRITERIA, EXPECTED_DIR, evaluate_file, explain, format_table, overlap, score_cv
 from app.schema import CV
 from tests.test_pipeline import FakeProvider
 from tests.test_schema import VALID_CV
@@ -71,3 +71,20 @@ def test_evaluate_file_with_a_perfect_model(samples_dir):
 def test_evaluate_file_counts_a_failure_as_zero(samples_dir):
     row = evaluate_file(samples_dir / "cv_tableaux_fr.docx", FakeProvider(["pas du JSON", "toujours pas"]), Settings(_env_file=None))
     assert row.total == 0 and "valide" in row.error
+
+
+def test_explain_says_what_differs():
+    got = _cv()
+    got.identity.phone = "06 00 00 00 00"
+    got.experiences[0].end = None
+    got.experiences[0].highlights = ["API REST", "Réalisation inventée"]
+    got.education = []
+    got.skills.append("Excel")
+    gaps = explain(_cv(), got)
+    assert "identité : téléphone attendu « 01 23 45 67 89 », obtenu « 06 00 00 00 00 »" in gaps
+    assert "dates de « Développeuse Python » : attendu 03/2021 – present, obtenu 03/2021 – None" in gaps
+    assert "réalisations de « Développeuse Python » : manque « Migration PostgreSQL »" in gaps
+    assert "réalisations de « Développeuse Python » : en trop « Réalisation inventée »" in gaps
+    assert "formation : manque « Master Informatique »" in gaps
+    assert "compétences : en trop « Excel »" in gaps
+    assert explain(_cv(), _cv()) == []

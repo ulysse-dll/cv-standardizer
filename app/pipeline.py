@@ -16,10 +16,10 @@ from app.anonymize import anonymize
 from app.config import Settings
 from app.coverage import find_missing_lines, find_unsupported_values
 from app.extraction import ExtractionResult, extract_text
-from app.fixes import fill_current_jobs
-from app.llm.base import LLMProvider, ProgressCallback
+from app.fixes import apply_fixes
+from app.llm.base import LLMError, LLMProvider, ProgressCallback
 from app.photo import extract_photo
-from app.prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
+from app.prompts import SYSTEM_PROMPT, build_repair_prompt, build_retry_prompt, build_user_prompt
 from app.render import PDFUnavailableError, render_html, render_pdf
 from app.schema import CV, cv_json_schema
 from app.slides import render_pptx
@@ -65,37 +65,67 @@ def summarize_error(error: ValidationError) -> str:
     return "; ".join(problems)
 
 
+def _ask(
+    text: str, user_prompt: str, provider: LLMProvider, timer: StepTimer, on_progress: Optional[ProgressCallback]
+) -> CV:
+    """Un appel au LLM, puis validation et corrections. Lève ValidationError si la réponse est invalide."""
+    with timer.step("llm"):
+        result = provider.generate_json(SYSTEM_PROMPT, user_prompt, cv_json_schema(), on_progress)
+    logger.info(
+        "[%s] %s tokens lus, %s tokens écrits, %s tokens/s",
+        timer.label, result.prompt_tokens, result.output_tokens, result.tokens_per_second,
+    )
+    if result.truncated:
+        logger.warning("[%s] réponse coupée : LLM_MAX_OUTPUT_TOKENS est trop bas pour ce CV", timer.label)
+    with timer.step("validation"):
+        cv = CV.model_validate_json(result.text)
+        return apply_fixes(cv, text)  # corrections sans LLM (voir fixes.py)
+
+
 def structure_cv(
-    text: str, provider: LLMProvider, timer: StepTimer, on_progress: Optional[ProgressCallback] = None
+    text: str,
+    provider: LLMProvider,
+    timer: StepTimer,
+    on_progress: Optional[ProgressCallback] = None,
+    repair: bool = False,
 ) -> Tuple[CV, int]:
-    """Demande au LLM de structurer le texte. Renvoie le CV validé et le nombre d'essais."""
-    schema = cv_json_schema()
+    """Demande au LLM de structurer le texte. Renvoie le CV validé et le nombre d'appels au LLM.
+
+    1. Jusqu'à MAX_ATTEMPTS appels pour obtenir un JSON valide.
+    2. Si `repair` est vrai et que des lignes du CV manquent dans le résultat :
+       une relance qui cite ces lignes. On ne garde le second résultat que
+       s'il oublie moins de lignes sans inventer davantage.
+    """
     user_prompt = build_user_prompt(text)
     last_error = ""
-
-    for attempt in range(1, MAX_ATTEMPTS + 1):
-        with timer.step("llm"):
-            result = provider.generate_json(SYSTEM_PROMPT, user_prompt, schema, on_progress)
-        logger.info(
-            "[%s] essai %d : %s tokens lus, %s tokens écrits, %s tokens/s",
-            timer.label, attempt, result.prompt_tokens, result.output_tokens, result.tokens_per_second,
-        )
-        if result.truncated:
-            logger.warning("[%s] réponse coupée : LLM_MAX_OUTPUT_TOKENS est trop bas pour ce CV", timer.label)
-
+    cv: Optional[CV] = None
+    attempts = 0
+    while cv is None and attempts < MAX_ATTEMPTS:
+        attempts += 1
         try:
-            with timer.step("validation"):
-                cv = CV.model_validate_json(result.text)
-                cv = fill_current_jobs(cv, text)  # correction sans LLM (voir fixes.py)
-            return cv, attempt
+            cv = _ask(text, user_prompt, provider, timer, on_progress)
         except ValidationError as error:
             last_error = summarize_error(error)
-            logger.warning("[%s] essai %d invalide : %s", timer.label, attempt, last_error)
+            logger.warning("[%s] essai %d invalide : %s", timer.label, attempts, last_error)
             user_prompt = build_retry_prompt(text, last_error)
+    if cv is None:
+        raise StructuringError(f"Le modèle n'a pas produit de CV valide après {MAX_ATTEMPTS} essais ({last_error}).")
 
-    raise StructuringError(
-        f"Le modèle n'a pas produit de CV valide après {MAX_ATTEMPTS} essais ({last_error})."
-    )
+    missing = find_missing_lines(text, cv) if repair else []
+    if missing:
+        logger.info("[%s] %d ligne(s) oubliée(s) : relance ciblée", timer.label, len(missing))
+        attempts += 1
+        try:
+            second = _ask(text, build_repair_prompt(text, missing), provider, timer, on_progress)
+        except (ValidationError, LLMError) as error:
+            logger.warning("[%s] relance sans résultat, on garde le premier : %s", timer.label, error)
+        else:
+            fewer_missing = len(find_missing_lines(text, second)) < len(missing)
+            not_more_invented = len(find_unsupported_values(text, second)) <= len(find_unsupported_values(text, cv))
+            if fewer_missing and not_more_invented:
+                cv = second
+            logger.info("[%s] relance %s", timer.label, "retenue" if cv is second else "écartée (pas meilleure)")
+    return cv, attempts
 
 
 @dataclass
@@ -170,7 +200,8 @@ def process_cv(
     expected_chars = len(text) + JSON_OVERHEAD_CHARS
     report("llm")
     cv, attempts = structure_cv(
-        text, provider, timer, lambda written: report("llm", min(written / expected_chars, 0.97))
+        text, provider, timer, lambda written: report("llm", min(written / expected_chars, 0.97)),
+        repair=settings.llm_repair,
     )
     report("rendu")
 

@@ -114,3 +114,54 @@ def test_very_long_cv_is_cut_with_a_warning(samples_dir):
 
     assert any("CV très long" in warning for warning in result.warnings)
     assert len(provider.prompts[0]) < 250
+
+
+# ------------------------------------------------ relance ciblée ----------
+REPAIR_TEXT = """Inès Benali
+Cheffe de projet marketing digital
+Formation
+Master Marketing digital, Audencia Business School
+Licence Économie-Gestion, Université de Rennes 1"""
+
+_BASE = {"identity": {"full_name": "Inès Benali"}, "title": "Cheffe de projet marketing digital"}
+_MASTER = {"degree": "Master Marketing digital", "school": "Audencia Business School"}
+_LICENCE = {"degree": "Licence Économie-Gestion", "school": "Université de Rennes 1"}
+ONE_DEGREE = json.dumps({**_BASE, "education": [_MASTER]})
+TWO_DEGREES = json.dumps({**_BASE, "education": [_MASTER, _LICENCE]})
+
+
+def test_repair_asks_again_and_keeps_the_more_complete_answer():
+    provider = FakeProvider([ONE_DEGREE, TWO_DEGREES])
+    cv, attempts = structure_cv(REPAIR_TEXT, provider, StepTimer("test"), repair=True)
+    assert attempts == 2
+    assert [study.degree for study in cv.education] == ["Master Marketing digital", "Licence Économie-Gestion"]
+    assert "Licence Économie-Gestion, Université de Rennes 1" in provider.prompts[1]  # la ligne oubliée est citée
+
+
+def test_repair_is_skipped_when_nothing_is_missing():
+    provider = FakeProvider([TWO_DEGREES])
+    _, attempts = structure_cv(REPAIR_TEXT, provider, StepTimer("test"), repair=True)
+    assert attempts == 1
+
+
+def test_repair_that_is_not_better_is_discarded():
+    worse = json.dumps({**_BASE, "education": []})  # la relance oublie encore plus
+    cv, attempts = structure_cv(REPAIR_TEXT, FakeProvider([ONE_DEGREE, worse]), StepTimer("test"), repair=True)
+    assert attempts == 2 and len(cv.education) == 1
+
+
+def test_repair_that_invents_is_discarded():
+    invented = json.dumps({**_BASE, "education": [_MASTER, _LICENCE], "skills": ["Pilotage d'hélicoptère"]})
+    cv, _ = structure_cv(REPAIR_TEXT, FakeProvider([ONE_DEGREE, invented]), StepTimer("test"), repair=True)
+    assert len(cv.education) == 1 and cv.skills == []
+
+
+def test_invalid_repair_keeps_the_first_answer():
+    cv, attempts = structure_cv(REPAIR_TEXT, FakeProvider([ONE_DEGREE, "pas du JSON"]), StepTimer("test"), repair=True)
+    assert attempts == 2 and len(cv.education) == 1
+
+
+def test_no_repair_by_default():
+    provider = FakeProvider([ONE_DEGREE])
+    _, attempts = structure_cv(REPAIR_TEXT, provider, StepTimer("test"))
+    assert attempts == 1 and len(provider.prompts) == 1

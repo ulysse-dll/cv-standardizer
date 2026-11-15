@@ -156,7 +156,7 @@ def header_lines(cv: CV) -> List[Line]:
 
 
 def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS, accent: RGBColor = ACCENT) -> List[Line]:
-    """La colonne grise : compétences, langues, formation, certifications."""
+    """La colonne grise : compétences, langues, formation, certifications, centres d'intérêt."""
     lines: List[Line] = []
     if cv.skills:
         # À l'intérieur d'une compétence courte, les espaces deviennent insécables :
@@ -190,6 +190,10 @@ def side_lines(cv: CV, labels: dict, max_skills: int = MAX_SKILLS, accent: RGBCo
             detail = _detail(certification.issuer, certification.date)
             if detail:
                 lines.append(detail)
+
+    if cv.interests:
+        lines.append(_heading(labels["interests"], not lines, accent))
+        lines.append(Line([(DOT.join(cv.interests[:8]), False, DARK)]))
     return lines
 
 

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     custom_model: str = ""
     custom_api_key: str = ""
 
+    # Si le contrôle repère des lignes du CV oubliées par le modèle, on le relance
+    # une fois en les lui citant (une minute de plus sur les CV concernés).
+    llm_repair: bool = True
     llm_timeout_s: int = 900
     llm_max_output_tokens: int = 2500
     max_cv_chars: int = 12000

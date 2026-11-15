@@ -238,6 +238,7 @@ DESIGN_CV = {
     "languages": [{"name": "Français", "level": "langue maternelle"}, {"name": "Anglais", "level": "courant"},
                   {"name": "Néerlandais", "level": "débutant"}],
     "certifications": [],
+    "interests": ["Cyclisme sur route", "Photographie argentique"],
 }
 _SKILL_DOTS = ["●●●●●", "●●●●○", "●●●●○", "●●●○○", "●●●○○", "●●●○○", "●●○○○"]
 

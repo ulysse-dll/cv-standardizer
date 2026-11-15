@@ -1,8 +1,13 @@
 """Outils partagés par tous les tests (pytest charge ce fichier tout seul)."""
 
+import os
 from pathlib import Path
 
 import pytest
+
+# Dans les tests, pas de relance ciblée du LLM : chaque faux modèle n'a que les
+# réponses qu'on lui a données. Les tests de la relance la réactivent eux-mêmes.
+os.environ["LLM_REPAIR"] = "false"
 
 from app import render, timing
 from samples.generate_samples import SAMPLES, SAMPLES_DIR

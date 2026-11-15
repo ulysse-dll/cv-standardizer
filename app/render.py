@@ -33,12 +33,12 @@ LABELS = {
     "fr": {
         "summary": "Profil", "experiences": "Expériences professionnelles", "education": "Formation",
         "skills": "Compétences", "languages": "Langues", "certifications": "Certifications",
-        "present": "aujourd'hui",
+        "interests": "Centres d'intérêt", "present": "aujourd'hui",
     },
     "en": {
         "summary": "Profile", "experiences": "Experience", "education": "Education",
         "skills": "Skills", "languages": "Languages", "certifications": "Certifications",
-        "present": "present",
+        "interests": "Interests", "present": "present",
     },
 }
 _FRENCH_WORDS = {"le", "la", "les", "des", "du", "et", "de", "en", "pour", "avec", "dans", "sur", "un", "une"}

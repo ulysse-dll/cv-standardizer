@@ -127,5 +127,12 @@
 </section>
 {% endif %}
 
+{% if cv.interests %}
+<section>
+  <h2>{{ labels.interests }}</h2>
+  <p>{{ cv.interests | join(" · ") }}</p>
+</section>
+{% endif %}
+
 </body>
 </html>

@@ -30,6 +30,10 @@ _IGNORED_WORDS = set(_MONTHS) | {
     "période", "poste", "entreprise", "réalisations", "outils", "méthodes",
     "experience", "work", "employment", "history", "professional", "education", "skills",
     "languages", "profile", "summary", "interests", "and", "the", "des", "les",
+    # autres titres de rubrique rencontrés
+    "academic", "background", "career", "toolbox", "training", "spoken", "about", "propos",
+    "certification", "expertise", "hobbies", "loisirs", "divers", "references", "références",
+    "objectif", "objective", "qualifications", "diplôme", "études", "studies", "personal", "details",
 }
 
 

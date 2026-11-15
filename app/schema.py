@@ -194,6 +194,7 @@ class CV(CleanModel):
     skills: List[str] = Field(default_factory=list)
     languages: List[Language] = Field(default_factory=list)
     certifications: List[Certification] = Field(default_factory=list)
+    interests: List[str] = Field(default_factory=list)  # centres d'intérêt, loisirs
 
 
 def _require_all_properties(node: Any) -> None:

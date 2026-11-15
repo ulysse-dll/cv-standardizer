@@ -83,3 +83,16 @@ def test_no_pdf_engine_gives_a_clear_error(monkeypatch):
     monkeypatch.setattr(render, "pdf_engine", lambda: None)
     with pytest.raises(PDFUnavailableError, match="Génération PDF indisponible"):
         render_pdf("<html></html>")
+
+
+def test_interests_are_shown_in_the_cv_and_on_the_slide():
+    from app.slides import render_pptx
+    import io
+    from pptx import Presentation
+
+    cv = CV.model_validate({"identity": {"full_name": "Hugo Fontaine"}, "interests": ["Cyclisme sur route", "Photographie argentique"]})
+    html = render_html(cv)
+    assert "Centres d&#39;intérêt" in html and "Cyclisme sur route · Photographie argentique" in html
+    slide = Presentation(io.BytesIO(render_pptx(cv)[0])).slides[0]
+    text = "\n".join(shape.text_frame.text for shape in slide.shapes if shape.has_text_frame).replace(" ", " ")
+    assert "CENTRES D'INTÉRÊT" in text and "Photographie argentique" in text

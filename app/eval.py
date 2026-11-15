@@ -32,7 +32,7 @@ from app.timing import StepTimer, setup_logging
 
 SAMPLES_DIR = ROOT_DIR / "samples"
 EXPECTED_DIR = SAMPLES_DIR / "expected"
-CRITERIA = ["identité", "postes", "dates", "réalisations", "formation", "compétences", "langues", "certifs"]
+CRITERIA = ["identité", "postes", "dates", "réalisations", "formation", "compétences", "langues", "certifs", "intérêts"]
 
 
 def overlap(expected: Sequence[Optional[str]], got: Sequence[Optional[str]]) -> float:
@@ -85,8 +85,52 @@ def score_cv(expected: CV, got: CV) -> Dict[str, float]:
         "compétences": overlap(expected.skills, got.skills),
         "langues": overlap([language.name for language in expected.languages], [language.name for language in got.languages]),
         "certifs": overlap([item.name for item in expected.certifications], [item.name for item in got.certifications]),
+        "intérêts": overlap(expected.interests, got.interests),
     }
     return {name: round(100 * value, 1) for name, value in scores.items()}
+
+
+def _list_gaps(label: str, expected: Sequence[Optional[str]], got: Sequence[Optional[str]]) -> List[str]:
+    """ "formation : manque « Licence X »" / "formation : en trop « Y »"."""
+    wanted = {normalize(value): value for value in expected if value}
+    found = {normalize(value): value for value in got if value}
+    gaps = [f"{label} : manque « {wanted[key]} »" for key in wanted if key not in found]
+    gaps += [f"{label} : en trop « {found[key]} »" for key in found if key not in wanted]
+    return gaps
+
+
+def explain(expected: CV, got: CV) -> List[str]:
+    """La liste, en clair, de ce qui diffère entre la bonne réponse et le résultat.
+
+    La note dit COMBIEN il manque ; cette liste dit QUOI. C'est elle qu'on lit
+    pour savoir quoi corriger.
+    """
+    gaps: List[str] = []
+    for label, wanted, found in [
+        ("nom", expected.identity.full_name, got.identity.full_name), ("e-mail", expected.identity.email, got.identity.email),
+        ("téléphone", expected.identity.phone, got.identity.phone), ("titre", expected.title, got.title),
+    ]:
+        if not _same(wanted, found):
+            gaps.append(f"identité : {label} attendu « {wanted} », obtenu « {found} »")
+
+    remaining = list(got.experiences)
+    for job in expected.experiences:
+        match = next((other for other in remaining if _same(job.job_title, other.job_title)), None)
+        if match is None:
+            gaps.append(f"postes : manque « {job.job_title} »")
+            continue
+        remaining.remove(match)
+        if not (_same(job.start, match.start) and _same(job.end, match.end)):
+            gaps.append(f"dates de « {job.job_title} » : attendu {job.start} – {job.end}, obtenu {match.start} – {match.end}")
+        gaps += _list_gaps(f"réalisations de « {job.job_title} »", job.highlights, match.highlights)
+    gaps += [f"postes : en trop « {job.job_title} »" for job in remaining]
+
+    gaps += _list_gaps("formation", [s.degree for s in expected.education], [s.degree for s in got.education])
+    gaps += _list_gaps("compétences", expected.skills, got.skills)
+    gaps += _list_gaps("langues", [l.name for l in expected.languages], [l.name for l in got.languages])
+    gaps += _list_gaps("certifs", [c.name for c in expected.certifications], [c.name for c in got.certifications])
+    gaps += _list_gaps("intérêts", expected.interests, got.interests)
+    return gaps
 
 
 @dataclass
@@ -100,6 +144,7 @@ class Row:
     attempts: int = 0
     seconds: float = 0.0
     error: Optional[str] = None
+    gaps: List[str] = field(default_factory=list)  # les écarts, en clair
 
     @property
     def total(self) -> float:
@@ -112,14 +157,17 @@ def evaluate_file(path: Path, provider: LLMProvider, settings: Settings) -> Row:
     started = time.monotonic()
     try:
         text = extract_text(path.read_bytes(), path.name, settings.ocr_languages).text[: settings.max_cv_chars]
-        cv, row.attempts = structure_cv(text, provider, StepTimer(path.name))
+        cv, row.attempts = structure_cv(text, provider, StepTimer(path.name), repair=settings.llm_repair)
     except Exception as error:  # un échec compte pour zéro, et on passe au CV suivant
         row.error = str(error)
         row.scores = {name: 0.0 for name in CRITERIA}
     else:
         row.scores = score_cv(expected, cv)
-        row.invented = len(find_unsupported_values(text, cv))
-        row.missing = len(find_missing_lines(text, cv))
+        row.gaps = explain(expected, cv)
+        invented, missing = find_unsupported_values(text, cv), find_missing_lines(text, cv)
+        row.invented, row.missing = len(invented), len(missing)
+        row.gaps += [f"alerte « inventé » : « {value} »" for value in invented]
+        row.gaps += [f"alerte « oublié » : « {line} »" for line in missing]
     row.seconds = round(time.monotonic() - started, 1)
     return row
 
@@ -167,6 +215,11 @@ def main() -> None:
 
     print(f"\nModèle : {provider.model} ({provider.name}) — notes sur 100")
     print(format_table(rows))
+    for row in rows:
+        if row.gaps:
+            print(f"\n{row.filename} :")
+            for gap in row.gaps:
+                print("  -", gap)
     if arguments.json_path:
         detail = {"model": provider.model, "rows": [{**row.__dict__, "total": row.total} for row in rows]}
         Path(arguments.json_path).write_text(json.dumps(detail, ensure_ascii=False, indent=2), encoding="utf-8")
