@@ -14,24 +14,23 @@ on:
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    # Les tests tournent dans l'image Python officielle de chaque version : Python 3.9
+    # (celui du Mac de développement) n'est plus proposé directement par GitHub.
+    container: python:${{ matrix.python }}-slim
     strategy:
       fail-fast: false          # si une version de Python échoue, on veut quand même voir l'autre
       matrix:
         python: ["3.9", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-          cache: pip
       - name: Bibliothèques système (OCR et PDF)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             tesseract-ocr tesseract-ocr-fra \
-            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-liberation
       - name: Bibliothèques Python
-        run: pip install -r requirements.txt
+        run: pip install --no-cache-dir -r requirements.txt
       - name: Diagnostic des moteurs disponibles
         run: python -c "from app import ocr, render; print('OCR :', ocr.ocr_engine(), '| PDF :', render.pdf_engine())"
       - name: Tests
