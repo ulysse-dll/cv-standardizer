@@ -4,16 +4,16 @@ Quand une information est écrite noir sur blanc dans le CV, mieux vaut la
 retrouver avec une règle simple que compter sur le modèle : c'est gratuit,
 instantané, et ça donne toujours le même résultat.
 
-Cinq corrections : l'intitulé de poste qui a avalé l'entreprise, le poste en
-cours, les coordonnées (e-mail, téléphone), les faux centres d'intérêt, et la
-date collée au nom d'une certification.
+Six corrections : l'intitulé de poste qui a avalé l'entreprise, le poste en
+cours, les coordonnées (e-mail, téléphone), les faux centres d'intérêt, la
+certification oubliée, et la date collée au nom d'une certification.
 """
 
 import difflib
 import re
 from typing import List, Optional
 
-from app.coverage import normalize
+from app.coverage import find_missing_lines, normalize
 from app.schema import CV, Certification
 
 # Les mots qui disent qu'un poste dure encore.
@@ -229,10 +229,40 @@ def tidy_certifications(cv: CV) -> CV:
     return cv
 
 
+# ----------------------------------------- certification oubliée ---------
+_ISSUER_SEPARATOR = re.compile(r"\s+[—–]\s+|\s+-\s+")
+
+
+def rescue_forgotten_certifications(cv: CV, source_text: str) -> CV:
+    """Une ligne de la rubrique « Certifications » que le modèle a oubliée est ajoutée telle quelle.
+
+    Sur un CV long, gemma3:4b s'arrête parfois avant la dernière ligne (vu :
+    la 3e certification, absente une fois sur deux). Une ligne de cette
+    rubrique se lit sans LLM : « Nom — Organisme, 2016 » ou « Nom, 2003 ».
+    On ne rattrape que les lignes signalées comme oubliées (coverage.py).
+    """
+    lines = source_text.splitlines()
+    for missing in find_missing_lines(source_text, cv, limit=20):
+        index = next((i for i, line in enumerate(lines) if line.startswith(missing.rstrip("."))), None)
+        if index is None or not _is_under_certifications(lines, index):
+            continue
+        line = _BULLET.sub("", lines[index]).strip()
+        name, issuer = line, None
+        parts = _ISSUER_SEPARATOR.split(line, maxsplit=1)
+        if len(parts) == 2:  # « Nom — Organisme, 2016 »
+            name, issuer = parts[0].strip(), _TRAILING_YEAR.sub("", parts[1]).strip(" ,") or None
+            year = _TRAILING_YEAR.search(parts[1])
+            cv.certifications.append(Certification(name=name, issuer=issuer, date=year.group(1) if year else None))
+        else:  # « Nom, 2003 » : tidy_certifications détachera l'année
+            cv.certifications.append(Certification(name=name))
+    return cv
+
+
 def apply_fixes(cv: CV, source_text: str) -> CV:
     """Toutes les corrections de ce fichier, dans l'ordre."""
     cv = split_job_titles(cv)  # d'abord : le poste en cours se cherche par l'intitulé
     cv = fill_current_jobs(cv, source_text)
     cv = fix_contact(cv, source_text)
     cv = clean_interests(cv, source_text)  # peut ajouter une certification : avant le rangement ci-dessous
+    cv = rescue_forgotten_certifications(cv, source_text)
     return tidy_certifications(cv)

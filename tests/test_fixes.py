@@ -180,3 +180,42 @@ def test_certification_names_that_must_not_be_touched():
     assert [(item.name, item.date) for item in cv.certifications] == [
         ("ISO 27001 Lead Auditor", "2021"), ("Certification Voltaire 2019", "2023"), ("PL-300", None),
     ]
+
+
+# ----------------------------------------- certification oubliée ---------
+from app.fixes import apply_fixes  # noqa: E402
+
+LONG_CV_END = """Langues
+Français (langue maternelle), Anglais (professionnel), Allemand (notions)
+Certifications
+Green Belt Lean Six Sigma — AFNOR, 2016
+Attestation de capacité de transport de marchandises, 2010
+CACES R489 catégories 1, 3 et 5, 2003"""
+
+
+def test_a_forgotten_certification_line_is_added_without_the_model():
+    # Vu avec gemma3:4b sur le CV long : la dernière certification absente du résultat.
+    cv = _certified(
+        {"name": "Green Belt Lean Six Sigma", "issuer": "AFNOR", "date": "2016"},
+        {"name": "Attestation de capacité de transport de marchandises", "date": "2010"},
+    )
+    cv.languages = CV.model_validate({"identity": {"full_name": "x"}, "languages": [
+        {"name": "Français", "level": "langue maternelle"}, {"name": "Anglais", "level": "professionnel"},
+        {"name": "Allemand", "level": "notions"}]}).languages
+    cv = apply_fixes(cv, LONG_CV_END)
+    assert [(item.name, item.issuer, item.date) for item in cv.certifications] == [
+        ("Green Belt Lean Six Sigma", "AFNOR", "2016"),
+        ("Attestation de capacité de transport de marchandises", None, "2010"),
+        ("CACES R489 catégories 1, 3 et 5", None, "2003"),
+    ]
+
+
+def test_a_forgotten_certification_with_an_issuer_is_parsed():
+    cv = apply_fixes(_certified(), "Certifications\nGreen Belt Lean Six Sigma — AFNOR, 2016")
+    assert [(item.name, item.issuer, item.date) for item in cv.certifications] == [("Green Belt Lean Six Sigma", "AFNOR", "2016")]
+
+
+def test_forgotten_lines_of_other_sections_are_not_turned_into_certifications():
+    source = "Certifications\nAFGSU niveau 2, 2022\nFormation\nDiplôme d'État d'infirmier, IFSI de Marseille, 2013"
+    cv = apply_fixes(_certified({"name": "AFGSU niveau 2", "date": "2022"}), source)
+    assert [item.name for item in cv.certifications] == ["AFGSU niveau 2"]  # le diplôme oublié reste à signaler, pas à ranger ici
