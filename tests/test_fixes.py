@@ -150,3 +150,33 @@ def test_a_language_filed_under_interests_is_not_turned_into_a_certification():
     source = "Certifications\nAFGSU niveau 2, 2022\nLangues\nEspéranto"
     cv = clean_interests(_with_interests("Espéranto"), source)
     assert cv.interests == [] and cv.certifications == []
+
+
+# ------------------------------------------- date collée au nom -----------
+from app.fixes import tidy_certifications  # noqa: E402
+
+
+def _certified(*items) -> CV:
+    return CV.model_validate({"identity": {"full_name": "Jean Dupont"}, "certifications": list(items)})
+
+
+def test_year_stuck_to_a_certification_name_becomes_its_date():
+    cv = tidy_certifications(_certified(
+        {"name": "CACES R489 catégories 1, 3 et 5, 2003"},  # vu avec gemma3:4b sur le CV long
+        {"name": "AFGSU niveau 2 (2022)", "date": "2022"},
+        {"name": "Green Belt Lean Six Sigma - 2016"},
+    ))
+    assert [(item.name, item.date) for item in cv.certifications] == [
+        ("CACES R489 catégories 1, 3 et 5", "2003"), ("AFGSU niveau 2", "2022"), ("Green Belt Lean Six Sigma", "2016"),
+    ]
+
+
+def test_certification_names_that_must_not_be_touched():
+    cv = tidy_certifications(_certified(
+        {"name": "ISO 27001 Lead Auditor", "date": "2021"},  # 27001 n'est pas une année
+        {"name": "Certification Voltaire 2019", "date": "2023"},  # la date dit autre chose : on ne tranche pas
+        {"name": "PL-300"},
+    ))
+    assert [(item.name, item.date) for item in cv.certifications] == [
+        ("ISO 27001 Lead Auditor", "2021"), ("Certification Voltaire 2019", "2023"), ("PL-300", None),
+    ]

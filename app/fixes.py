@@ -4,8 +4,9 @@ Quand une information est écrite noir sur blanc dans le CV, mieux vaut la
 retrouver avec une règle simple que compter sur le modèle : c'est gratuit,
 instantané, et ça donne toujours le même résultat.
 
-Quatre corrections : l'intitulé de poste qui a avalé l'entreprise, le poste en
-cours, les coordonnées (e-mail, téléphone), et les faux centres d'intérêt.
+Cinq corrections : l'intitulé de poste qui a avalé l'entreprise, le poste en
+cours, les coordonnées (e-mail, téléphone), les faux centres d'intérêt, et la
+date collée au nom d'une certification.
 """
 
 import difflib
@@ -207,9 +208,31 @@ def clean_interests(cv: CV, source_text: str) -> CV:
     return cv
 
 
+# ------------------------------------------- date collée au nom -----------
+# Une année en fin de nom, précédée d'une virgule, d'un tiret ou entre parenthèses.
+_TRAILING_YEAR = re.compile(r"[\s,;–—-]*\(?\b((?:19|20)\d{2})\)?\s*$")
+
+
+def tidy_certifications(cv: CV) -> CV:
+    """« CACES R489 catégories 1, 3 et 5, 2003 » -> nom « CACES R489 catégories 1, 3 et 5 », date « 2003 ».
+
+    Le modèle recopie parfois la ligne entière dans le nom (vu sur le CV long).
+    On ne détache l'année que si la date est vide ou dit déjà la même chose.
+    """
+    for item in cv.certifications:
+        match = _TRAILING_YEAR.search(item.name)
+        if not match or match.start() == 0:  # pas d'année en fin de nom, ou le nom n'est QUE l'année
+            continue
+        year = match.group(1)
+        if item.date in (None, year):
+            item.name, item.date = item.name[: match.start()].strip(), year
+    return cv
+
+
 def apply_fixes(cv: CV, source_text: str) -> CV:
     """Toutes les corrections de ce fichier, dans l'ordre."""
     cv = split_job_titles(cv)  # d'abord : le poste en cours se cherche par l'intitulé
     cv = fill_current_jobs(cv, source_text)
     cv = fix_contact(cv, source_text)
-    return clean_interests(cv, source_text)
+    cv = clean_interests(cv, source_text)  # peut ajouter une certification : avant le rangement ci-dessous
+    return tidy_certifications(cv)
