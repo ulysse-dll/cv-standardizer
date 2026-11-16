@@ -1,5 +1,7 @@
 # CV Standardizer
 
+[![tests](https://github.com/ulysse-dll/cv-standardizer/actions/workflows/tests.yml/badge.svg)](https://github.com/ulysse-dll/cv-standardizer/actions/workflows/tests.yml)
+
 *[Version française (complète)](README.md)*
 
 Turns CVs of any shape (PDF, DOCX, scans) into one consistent format,
@@ -78,8 +80,10 @@ On a 2018 Intel Mac mini (i5-8500B, no usable GPU) with `gemma3:4b`:
 
 ## Known limits
 
-- Developed and tested on one machine (macOS 15, Intel). The Docker files and
-  the Linux paths (Tesseract, WeasyPrint) have not been run.
+- Developed on one machine (macOS 15, Intel). On every push, GitHub runs the
+  tests on Linux (Python 3.9 and 3.12, with Tesseract and WeasyPrint) and
+  builds the Docker image. `docker compose` with the Ollama container, and a
+  real model run on Linux, have not been tried.
 - Slides were checked with macOS Quick Look only, not in PowerPoint or Keynote.
 - A small model can still forget or misplace information: read the result.
   The page flags what the checks find, and the correction form fixes it.

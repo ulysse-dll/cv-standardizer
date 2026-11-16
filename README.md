@@ -1,5 +1,7 @@
 # CV Standardizer
 
+[![tests](https://github.com/ulysse-dll/cv-standardizer/actions/workflows/tests.yml/badge.svg)](https://github.com/ulysse-dll/cv-standardizer/actions/workflows/tests.yml)
+
 Transforme des CV de toutes formes (PDF, DOCX, scans) en CV au même format,
 **entièrement en local et gratuitement** : un petit modèle de langage tourne
 sur ta machine via Ollama. Aucune clé d'API payante, aucun CV envoyé sur
@@ -399,7 +401,8 @@ Pour régénérer les faux CV : `.venv/bin/python samples/generate_samples.py`
 | `app/eval.py` | Banc d'essai : note le modèle contre des réponses attendues |
 | `app/check.py` | Diagnostic de l'installation (`python -m app.check`) |
 | `install.sh`, `run.sh`, `Lancer.command` | Installer, lancer, lancer d'un double-clic (Mac) |
-| `Dockerfile`, `docker-compose.yml` | Déploiement sur un serveur Linux (non essayé) |
+| `Dockerfile`, `docker-compose.yml` | Déploiement sur un serveur Linux |
+| `.github/workflows/tests.yml` | Tests automatiques sur GitHub (Linux, Python 3.9 et 3.12, image Docker) |
 | `requirements.txt`, `requirements.lock` | Les bibliothèques ; les versions exactes testées |
 | `samples/` | Les faux CV et le script qui les fabrique |
 | `tests/` | Les tests pytest |
@@ -467,10 +470,13 @@ docker compose exec app python -m app.check         # diagnostic
 Puis <http://127.0.0.1:8000> depuis le serveur. Sous Linux, l'OCR passe par
 Tesseract et le PDF par WeasyPrint, installés dans l'image.
 
-**Non essayé** : Docker n'est pas installé sur la machine de développement.
-Ni les deux fichiers Docker, ni les chemins Tesseract et WeasyPrint n'ont
-tourné une seule fois. Attends-toi à devoir ajuster, et commence par le
-diagnostic.
+**Ce qui est vérifié** : à chaque envoi sur GitHub, l'image est construite,
+puis on contrôle qu'elle démarre, que l'OCR passe par Tesseract et qu'elle
+fabrique un PDF avec WeasyPrint. Les tests tournent aussi sous Linux avec
+ces deux outils (voir le badge en haut de cette page).
+
+**Ce qui ne l'est pas** : `docker compose` avec le conteneur Ollama, et le
+traitement d'un vrai CV par le modèle sous Linux. Commence par le diagnostic.
 
 Sans carte graphique, compte sur une vitesse du même ordre que sur un Mac
 Intel (une à deux minutes par CV).

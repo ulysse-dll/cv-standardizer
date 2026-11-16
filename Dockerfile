@@ -1,8 +1,8 @@
 # Image Docker de l'application, pour un serveur Linux.
 #
-# ATTENTION : ce fichier n'a pas pu être essayé sur la machine de
-# développement (Docker n'y est pas installé). Voir le README, section
-# « Déploiement ».
+# Vérifié automatiquement sur GitHub à chaque envoi : l'image se construit,
+# démarre, et contient l'OCR (Tesseract) et le PDF (WeasyPrint).
+# Voir le README, section « Déploiement ».
 #
 #     docker compose up --build          (avec le docker-compose.yml fourni)
 

@@ -1,6 +1,7 @@
 # Deux conteneurs : l'application et Ollama (le modèle de langage).
 #
-# ATTENTION : non essayé sur la machine de développement (pas de Docker).
+# L'image de l'application est vérifiée sur GitHub ; ce fichier, avec le
+# conteneur Ollama, n'a pas encore été lancé.
 #
 #     docker compose up --build -d
 #     docker compose exec ollama ollama pull gemma3:4b      (une seule fois)
