@@ -1,0 +1,57 @@
+# Tests automatiques : lancés par GitHub à chaque envoi sur main et à chaque pull request.
+#
+# Deux vérifications, toutes deux sous Linux (alors que le projet est développé sur Mac) :
+#   1. les tests pytest, avec Tesseract (OCR) et Pango (PDF par WeasyPrint) installés ;
+#   2. la construction de l'image Docker, et la présence de l'OCR et du PDF dedans.
+# Aucun modèle de langage ici : les tests utilisent un faux LLM.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # si une version de Python échoue, on veut quand même voir l'autre
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Bibliothèques système (OCR et PDF)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-fra \
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+      - name: Bibliothèques Python
+        run: pip install -r requirements.txt
+      - name: Diagnostic des moteurs disponibles
+        run: python -c "from app import ocr, render; print('OCR :', ocr.ocr_engine(), '| PDF :', render.pdf_engine())"
+      - name: Tests
+        run: python -m pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construction de l'image
+        run: docker build -t cv-standardizer .
+      - name: L'image démarre, avec OCR et PDF
+        run: |
+          docker run --rm cv-standardizer python -c "
+          import app.main
+          from app import ocr, render
+          assert ocr.ocr_engine() == 'tesseract', ocr.ocr_engine()
+          assert render.pdf_engine() == 'weasyprint', render.pdf_engine()
+          from app.schema import CV
+          pdf = render.render_pdf(render.render_html(CV.model_validate({'identity': {'full_name': 'Essai Docker'}})))
+          assert pdf.startswith(b'%PDF'), 'pas de PDF'
+          print('image correcte : OCR tesseract, PDF weasyprint,', len(pdf), 'octets')
+          "
