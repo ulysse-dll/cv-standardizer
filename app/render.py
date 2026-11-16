@@ -11,13 +11,15 @@ défaut, un navigateur de la famille Chrome déjà installé sur la machine.
 import base64
 import contextlib
 import io
+import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -154,6 +156,35 @@ def find_browser() -> Optional[str]:
     return None
 
 
+def _run_browser(command: List[str]) -> None:
+    """Lance le navigateur et attend sa fin, sans jamais rester bloqué.
+
+    Un navigateur démarre plusieurs programmes auxiliaires. S'il se fige, il
+    faut tous les arrêter, sinon ils continuent de tourner en arrière-plan :
+    - start_new_session=True les met dans un groupe à part ;
+    - passé le délai, os.killpg arrête tout le groupe d'un coup.
+    On ne lit pas ce que le navigateur affiche (DEVNULL) : attendre ce texte
+    pourrait nous bloquer à notre tour.
+    """
+    try:
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
+        )
+    except OSError as error:
+        raise PDFUnavailableError(f"Génération PDF impossible : le navigateur n'a pas démarré ({error}).") from error
+    try:
+        process.wait(timeout=BROWSER_TIMEOUT_S)
+    except subprocess.TimeoutExpired as error:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            process.kill()
+        process.wait()
+        raise PDFUnavailableError(
+            f"Génération PDF impossible : le navigateur n'a pas répondu en {BROWSER_TIMEOUT_S} s."
+        ) from error
+
+
 def _pdf_with_browser(html: str, browser: str) -> bytes:
     # Le navigateur lit un fichier et en écrit un autre : on passe par un
     # dossier temporaire, supprimé (avec son contenu) dès la sortie du "with".
@@ -181,10 +212,7 @@ def _pdf_with_browser(html: str, browser: str) -> bytes:
             f"--print-to-pdf={target}",
             source.as_uri(),
         ]
-        try:
-            subprocess.run(command, capture_output=True, timeout=BROWSER_TIMEOUT_S, check=False)
-        except (OSError, subprocess.TimeoutExpired) as error:
-            raise PDFUnavailableError(f"Génération PDF impossible : le navigateur a échoué ({error}).") from error
+        _run_browser(command)
         if not target.exists():
             raise PDFUnavailableError("Génération PDF impossible : le navigateur n'a produit aucun fichier.")
         return target.read_bytes()

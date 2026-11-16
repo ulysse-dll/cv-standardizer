@@ -93,3 +93,18 @@ def test_interests_are_shown_in_the_cv_and_on_the_slide():
     assert "Centres d&#39;intérêt" in html and "Cyclisme sur route · Photographie argentique" in html
     text = slide_texts(render_pptx(cv)[0])[0]
     assert "CENTRES D'INTÉRÊT" in text and "Photographie argentique" in text
+
+
+def test_a_frozen_browser_is_stopped_and_reported(monkeypatch, tmp_path):
+    # Un faux « navigateur » qui ne répond jamais : on doit rendre la main après le délai.
+    frozen = tmp_path / "navigateur_fige.sh"
+    frozen.write_text("#!/bin/sh\nsleep 30\n", encoding="utf-8")
+    frozen.chmod(0o755)
+    monkeypatch.setattr(render, "BROWSER_TIMEOUT_S", 1)
+    with pytest.raises(PDFUnavailableError, match="n'a pas répondu en 1 s"):
+        render._pdf_with_browser("<html></html>", str(frozen))
+
+
+def test_a_browser_that_cannot_start_is_reported():
+    with pytest.raises(PDFUnavailableError, match="n'a pas démarré"):
+        render._pdf_with_browser("<html></html>", "/chemin/qui/n/existe/pas")
