@@ -5,6 +5,16 @@ Transforme des CV de toutes formes (PDF, DOCX, scans) en CV au même format,
 sur ta machine via Ollama. Aucune clé d'API payante, aucun CV envoyé sur
 Internet (par défaut).
 
+*[English version](README.en.md)*
+
+![Fiche PowerPoint produite à partir d'un faux CV](docs/fiche-exemple.png)
+
+| La page, CV standardisé | L'aperçu de la fiche | La correction à la main |
+|---|---|---|
+| ![La page avec un lot de CV et l'aperçu du CV standardisé](docs/page-cv.png) | ![L'onglet Diapositive](docs/page-fiche.png) | ![Le formulaire de correction](docs/page-corriger.png) |
+
+Les CV de ces captures sont inventés.
+
 ```
 fichier ──► 1. extraction du texte ──► 2. LLM ──► 3. validation ──► 4. génération
             PyMuPDF / python-docx       JSON        Pydantic          HTML ─► PDF
